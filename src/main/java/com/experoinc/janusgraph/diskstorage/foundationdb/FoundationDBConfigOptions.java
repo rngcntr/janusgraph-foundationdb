@@ -60,6 +60,4 @@ public interface FoundationDBConfigOptions {
         "Options are serializable, read_committed_no_write, read_committed_with_write",
         ConfigOption.Type.LOCAL,
         "serializable");
-
-
 }

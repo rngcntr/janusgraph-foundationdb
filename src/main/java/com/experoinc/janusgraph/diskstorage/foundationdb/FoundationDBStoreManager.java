@@ -14,6 +14,9 @@
 
 package com.experoinc.janusgraph.diskstorage.foundationdb;
 
+import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.*;
+import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.GRAPH_NAME;
+
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.FDB;
 import com.apple.foundationdb.Transaction;
@@ -21,6 +24,10 @@ import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.directory.PathUtil;
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.BaseTransactionConfig;
 import org.janusgraph.diskstorage.PermanentBackendException;
@@ -38,20 +45,13 @@ import org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-
-import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.*;
-import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.GRAPH_NAME;
-
 /**
  * Experimental FoundationDB storage manager implementation.
  *
  * @author Ted Wilmes (twilmes@gmail.com)
  */
-public class FoundationDBStoreManager extends AbstractStoreManager implements OrderedKeyValueStoreManager {
+public class FoundationDBStoreManager
+    extends AbstractStoreManager implements OrderedKeyValueStoreManager {
 
     private static final Logger log = LoggerFactory.getLogger(FoundationDBStoreManager.class);
 
@@ -68,43 +68,39 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
         super(configuration);
         stores = new ConcurrentHashMap<>();
 
-        fdb = FDB.selectAPIVersion(determineFoundationDbVersion(configuration));
+        fdb = FDB.selectAPIVersion(configuration.get(VERSION));
         rootDirectoryName = determineRootDirectoryName(configuration);
-        db = !"default".equals(configuration.get(CLUSTER_FILE_PATH)) ?
-            fdb.open(configuration.get(CLUSTER_FILE_PATH)) : fdb.open();
+        db = "default".equals(configuration.get(CLUSTER_FILE_PATH))
+                 ? fdb.open()
+                 : fdb.open(configuration.get(CLUSTER_FILE_PATH));
 
-        final String isolationLevelStr = configuration.get(ISOLATION_LEVEL);
-        switch (isolationLevelStr.toLowerCase().trim()) {
-            case "serializable":
-                isolationLevel = FoundationDBTx.IsolationLevel.SERIALIZABLE;
-                break;
-            case "read_committed_no_write":
-                isolationLevel = FoundationDBTx.IsolationLevel.READ_COMMITTED_NO_WRITE;
-                break;
-            case "read_committed_with_write":
-                isolationLevel = FoundationDBTx.IsolationLevel.READ_COMMITTED_WITH_WRITE;
-                break;
-            default:
-                throw new PermanentBackendException("Unrecognized isolation level " + isolationLevelStr);
+        try {
+            isolationLevel = FoundationDBTx.IsolationLevel.valueOf(
+                configuration.get(ISOLATION_LEVEL).toUpperCase().trim());
+        } catch (IllegalArgumentException iaex) {
+            throw new PermanentBackendException("Unrecognized isolation level " +
+                                                configuration.get(ISOLATION_LEVEL));
         }
+
         initialize(rootDirectoryName);
 
         features = new StandardStoreFeatures.Builder()
-                    .orderedScan(true)
-                    .transactional(transactional)
-                    .keyConsistent(GraphDatabaseConfiguration.buildGraphConfiguration())
-                    .locking(true)
-                    .keyOrdered(true)
-                    .supportsInterruption(false)
-                    .optimisticLocking(true)
-                    .multiQuery(true)
-                    .build();
+                       .orderedScan(true)
+                       .transactional(transactional)
+                       .keyConsistent(GraphDatabaseConfiguration.buildGraphConfiguration())
+                       .locking(true)
+                       .keyOrdered(true)
+                       .supportsInterruption(false)
+                       .optimisticLocking(true)
+                       .multiQuery(true)
+                       .build();
     }
 
     private void initialize(final String directoryName) throws BackendException {
         try {
             // create the root directory to hold the JanusGraph data
-            rootDirectory = DirectoryLayer.getDefault().createOrOpen(db, PathUtil.from(directoryName)).get();
+            rootDirectory =
+                DirectoryLayer.getDefault().createOrOpen(db, PathUtil.from(directoryName)).get();
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
@@ -121,10 +117,10 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
     }
 
     @Override
-    public StoreTransaction beginTransaction(final BaseTransactionConfig txCfg) throws BackendException {
+    public StoreTransaction beginTransaction(final BaseTransactionConfig txCfg)
+        throws BackendException {
         try {
             final Transaction tx = db.createTransaction();
-
             final StoreTransaction fdbTx = new FoundationDBTx(db, tx, txCfg, isolationLevel);
 
             if (log.isTraceEnabled()) {
@@ -144,7 +140,8 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
             return stores.get(name);
         }
         try {
-            final DirectorySubspace storeDb = rootDirectory.createOrOpen(db, PathUtil.from(name)).get();
+            final DirectorySubspace storeDb =
+                rootDirectory.createOrOpen(db, PathUtil.from(name)).get();
             log.debug("Opened database {}", name, new Throwable());
 
             FoundationDBKeyValueStore store = new FoundationDBKeyValueStore(name, storeDb, this);
@@ -156,8 +153,9 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
     }
 
     @Override
-    public void mutateMany(Map<String, KVMutation> mutations, StoreTransaction txh) throws BackendException {
-        for (Map.Entry<String,KVMutation> mutation : mutations.entrySet()) {
+    public void mutateMany(Map<String, KVMutation> mutations, StoreTransaction txh)
+        throws BackendException {
+        for (Map.Entry<String, KVMutation> mutation : mutations.entrySet()) {
             FoundationDBKeyValueStore store = openDatabase(mutation.getKey());
             KVMutation mutationValue = mutation.getValue();
 
@@ -169,13 +167,14 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
 
             if (mutationValue.hasAdditions()) {
                 for (KeyValueEntry entry : mutationValue.getAdditions()) {
-                    store.insert(entry.getKey(),entry.getValue(),txh);
+                    store.insert(entry.getKey(), entry.getValue(), txh);
                     log.trace("Insertion on {}: {}", mutation.getKey(), entry);
                 }
             }
+
             if (mutationValue.hasDeletions()) {
                 for (StaticBuffer del : mutationValue.getDeletions()) {
-                    store.delete(del,txh);
+                    store.delete(del, txh);
                     log.trace("Deletion on {}: {}", mutation.getKey(), del);
                 }
             }
@@ -184,33 +183,38 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
 
     void removeDatabase(FoundationDBKeyValueStore db) {
         if (!stores.containsKey(db.getName())) {
-            throw new IllegalArgumentException("Tried to remove an unkown database from the storage manager");
+            throw new IllegalArgumentException(
+                "Tried to remove an unkown database from the storage manager");
         }
+
         String name = db.getName();
         stores.remove(name);
         log.debug("Removed database {}", name);
     }
 
-
     @Override
     public void close() throws BackendException {
         if (fdb != null) {
-            if (!stores.isEmpty())
-                throw new IllegalStateException("Cannot shutdown manager since some databases are still open");
+            if (!stores.isEmpty()) {
+                throw new IllegalStateException(
+                    "Cannot shutdown manager since some databases are still open");
+            }
+
             try {
                 // TODO this looks like a race condition
-                //Wait just a little bit before closing so that independent transaction threads can clean up.
+                // Wait just a little bit before closing so that independent transaction threads can
+                // clean up.
                 Thread.sleep(30);
             } catch (InterruptedException e) {
-                //Ignore
+                // Ignore
             }
+
             try {
                 db.close();
             } catch (Exception e) {
                 throw new PermanentBackendException("Could not close FoundationDB database", e);
             }
         }
-
     }
 
     @Override
@@ -239,21 +243,17 @@ public class FoundationDBStoreManager extends AbstractStoreManager implements Or
         return getClass().getSimpleName();
     }
 
-
     private static class TransactionBegin extends Exception {
         private static final long serialVersionUID = 1L;
 
-        private TransactionBegin(String msg) {
-            super(msg);
-        }
+        private TransactionBegin(String msg) { super(msg); }
     }
 
     private String determineRootDirectoryName(Configuration config) {
-        if (!config.has(DIRECTORY) && (config.has(GRAPH_NAME))) return config.get(GRAPH_NAME);
-        return config.get(DIRECTORY);
-    }
-
-    private int determineFoundationDbVersion(Configuration config) {
-        return config.get(VERSION);
+        if (!config.has(DIRECTORY) && (config.has(GRAPH_NAME))) {
+            return config.get(GRAPH_NAME);
+        } else {
+            return config.get(DIRECTORY);
+        }
     }
 }
