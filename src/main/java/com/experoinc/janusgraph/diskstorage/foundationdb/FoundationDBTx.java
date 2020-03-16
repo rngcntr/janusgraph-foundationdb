@@ -71,12 +71,21 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             tx.close();
         }
         tx = db.createTransaction();
+
         // Reapply mutations but do not clear them out just in case this transaction also
         // times out and they need to be reapplied.
         //
         // @todo Note that at this point, the large transaction case (tx exceeds 10,000,000 bytes) is not handled.
-        inserts.forEach(insert -> tx.set(insert.getKey(), insert.getValue()));
-        deletions.forEach(delete -> tx.clear(delete));
+
+        inserts.forEach(insert -> {
+            tx.addReadConflictKey(insert.getKey());
+            tx.set(insert.getKey(), insert.getValue());
+        });
+
+        deletions.forEach(delete -> {
+            tx.addReadConflictKey(delete);
+            tx.clear(delete);
+        });
     }
 
     @Override
@@ -238,11 +247,13 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     public void set(final byte[] key, final byte[] value) {
         inserts.add(new Insert(key, value));
+        tx.addReadConflictKey(key);
         tx.set(key, value);
     }
 
     public void clear(final byte[] key) {
         deletions.add(key);
+        tx.addReadConflictKey(key);
         tx.clear(key);
     }
 
