@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -176,14 +175,12 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         FoundationDBTx tx = getTransaction(txh);
         final Map<KVQuery, RecordIterator<KeyValueEntry>> resultMap = new ConcurrentHashMap<>();
-        final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         try {
             final List<Object[]> preppedQueries = new LinkedList<>();
             for (final KVQuery query : queries) {
                 final StaticBuffer keyStart = query.getStart();
                 final StaticBuffer keyEnd = query.getEnd();
-                final KeySelector selector = query.getKeySelector();
                 final byte[] foundKey = db.pack(keyStart.as(ENTRY_FACTORY));
                 final byte[] endKey = db.pack(keyEnd.as(ENTRY_FACTORY));
                 preppedQueries.add(new Object[]{query, foundKey, endKey});
