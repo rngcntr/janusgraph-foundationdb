@@ -25,8 +25,6 @@ import org.apache.tinkerpop.gremlin.GraphProvider;
 import java.time.Duration;
 import java.util.Set;
 
-import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.USE_MULTIQUERY;
-
 /**
  * @author Ted Wilmes (twilmes@gmail.com)
  */
@@ -46,10 +44,10 @@ public class FoundationDBGraphComputerProvider extends AbstractJanusGraphCompute
     }
 
     @Override
+    @SuppressWarnings("rawtypes")
     public Set<Class> getImplementations() {
         final Set<Class> implementations = super.getImplementations();
         implementations.add(FoundationDBTx.class);
         return implementations;
     }
-
 }

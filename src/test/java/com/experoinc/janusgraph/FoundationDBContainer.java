@@ -14,18 +14,22 @@
 
 package com.experoinc.janusgraph;
 
-import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
-import org.janusgraph.diskstorage.configuration.WriteConfiguration;
-import org.junit.Assert;
-import org.testcontainers.containers.FixedHostPortGenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.CLUSTER_FILE_PATH;
+import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.DIRECTORY;
+import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.ISOLATION_LEVEL;
+import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.DROP_ON_CLEAR;
+import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.STORAGE_BACKEND;
+import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.buildGraphConfiguration;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import static com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions.*;
-import static org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration.*;
+import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
+import org.janusgraph.diskstorage.configuration.WriteConfiguration;
+import org.junit.Assert;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 
 /**
  * @author Ted Wilmes (twilmes@gmail.com)
@@ -39,6 +43,8 @@ public class FoundationDBContainer extends FixedHostPortGenericContainer<Foundat
         withFixedExposedPort(4500, 4500);
         withFileSystemBind("./etc", "/etc/foundationdb");
         withEnv("FDB_NETWORKING_MODE", "host");
+        withEnv("LD_LIBRARY_PATH", "/opt");
+        withEnv("FDB_CLUSTER_FILE", "/opt/fdb.cluster");
         waitingFor(
                 Wait.forLogMessage(".*FDBD joined cluster.*\\n", 1)
         );

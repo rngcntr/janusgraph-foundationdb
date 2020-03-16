@@ -47,6 +47,7 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     @Container
     public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
+    @SuppressWarnings("unused")
     private static final Logger log =
             LoggerFactory.getLogger(FoundationDBGraphTest.class);
 
