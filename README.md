@@ -13,7 +13,7 @@ JanusGraph, coupled with the FoundationDB storage adapter provides the following
 
 |FDB Storage Adapter|JanusGraph|FoundationDB|
 |-:|-:|-:|
-|0.1.0|0.3.0|5.2.5|
+|0.1.1|0.4.0|6.1.8|
 
 # Getting started
 
