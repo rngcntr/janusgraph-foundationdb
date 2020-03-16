@@ -14,9 +14,9 @@
         <maven.compiler.plugin.version>3.6.2</maven.compiler.plugin.version>
         <jdk.version>1.8</jdk.version>
         <janusgraph.version>0.4.0</janusgraph.version>
-        <foundationdb.version>6.1.8</foundationdb.version>
+        <foundationdb.version>6.2.10</foundationdb.version>
         <dependency.plugin.version>2.10</dependency.plugin.version>
-        <testcontainers.version>1.11.4</testcontainers.version>
+        <testcontainers.version>1.13.0</testcontainers.version>
         <test.skip.default>false</test.skip.default>
         <test.skip.tp>true</test.skip.tp>
     </properties>
@@ -42,7 +42,7 @@
             </snapshots>
             <id>central</id>
             <name>bintray</name>
-            <url>http://jcenter.bintray.com</url>
+            <url>https://jcenter.bintray.com</url>
         </repository>
         <repository>
             <snapshots>
@@ -82,7 +82,7 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
-        </dependency>
+        </dependency> 
     </dependencies>
 
     <build>

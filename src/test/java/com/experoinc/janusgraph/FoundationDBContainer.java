@@ -34,7 +34,7 @@ public class FoundationDBContainer extends FixedHostPortGenericContainer<Foundat
     private boolean firstTime = true;
 
     public FoundationDBContainer() {
-        super("foundationdb/foundationdb:6.1.12");
+        super("foundationdb/foundationdb:6.2.18");
         withExposedPorts(4500);
         withFixedExposedPort(4500, 4500);
         withFileSystemBind("./etc", "/etc/foundationdb");
