@@ -25,3 +25,8 @@ target/
 etc
 
 jub*.xml
+
+# VS Code files
+.project
+.classpath
+.settings/
