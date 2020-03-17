@@ -23,10 +23,12 @@ import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.OrderedKeyValueStoreMa
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * @author Ted Wilmes (twilmes@gmail.com)
  */
+@Testcontainers
 public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
 
     @Container

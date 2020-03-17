@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @Testcontainers
 public class FoundationDBKeyValueTest extends KeyValueStoreTest {
+
     @Container
     public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
