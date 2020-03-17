@@ -74,6 +74,10 @@ public class FoundationDBStoreManager
                  ? fdb.open()
                  : fdb.open(configuration.get(CLUSTER_FILE_PATH));
 
+        // the following options are currently unused but may be used in the future
+        db.options().setTransactionTimeout(configuration.get(TRANSACTION_TIMEOUT));
+        db.options().setTransactionRetryLimit(configuration.get(TRANSACTION_RETRIES));
+
         try {
             isolationLevel = FoundationDBTx.IsolationLevel.valueOf(
                 configuration.get(ISOLATION_LEVEL).toUpperCase().trim());

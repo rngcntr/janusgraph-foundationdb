@@ -60,4 +60,18 @@ public interface FoundationDBConfigOptions {
         "Options are serializable, read_committed_no_write, read_committed_with_write",
         ConfigOption.Type.LOCAL,
         "serializable");
+
+    ConfigOption<Long> TRANSACTION_TIMEOUT = new ConfigOption<>(
+        FDB_NS,
+        "transaction-timeout",
+        "Timeout for transactions in milliseconds",
+        ConfigOption.Type.LOCAL,
+        60000L);
+
+    ConfigOption<Long> TRANSACTION_RETRIES = new ConfigOption<>(
+        FDB_NS,
+        "transaction-retries",
+        "Maximum number of times to retry a transaction",
+        ConfigOption.Type.LOCAL,
+        100L);
 }

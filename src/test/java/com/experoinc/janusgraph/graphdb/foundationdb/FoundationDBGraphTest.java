@@ -152,4 +152,15 @@ public class FoundationDBGraphTest extends JanusGraphTest {
 
         assertEquals(1000, g.V().has("from", "id", 0).out().out().count().next().longValue());
     }
+
+    @Test
+    public void testDeleteNode(){
+        GraphTraversalSource g = graph.traversal();
+
+        g.addV("testVertex").property("id", 0).next();
+        assertEquals(1, g.V().count().next().longValue());
+
+        g.V().has("id", 0).drop().iterate();
+        assertEquals(0, g.V().count().next().longValue());
+    }
 }
