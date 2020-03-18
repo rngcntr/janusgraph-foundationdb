@@ -14,10 +14,15 @@
 
 package com.experoinc.janusgraph.diskstorage.foundationdb;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.experoinc.janusgraph.FoundationDBContainer;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.KeyValueStoreTest;
+import org.janusgraph.diskstorage.KeyValueStoreUtil;
+import org.janusgraph.diskstorage.StaticBuffer;
 import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.OrderedKeyValueStoreManager;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -27,11 +32,33 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 public class FoundationDBKeyValueTest extends KeyValueStoreTest {
 
-    @Container
-    public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
+    @Container public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
     @Override
     public OrderedKeyValueStoreManager openStorageManager() throws BackendException {
         return new FoundationDBStoreManager(fdbContainer.getFoundationDBConfiguration());
+    }
+
+    @Test
+    public void storeAndRetrieveWithLongTransaction() throws BackendException {
+        String[] values = generateValues();
+        loadValues(values);
+        clopen();
+        checkValueExistence(values);
+
+        try {
+            Thread.sleep(6000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        checkValues(values);
+    }
+
+    @Test
+    public void readYourWritesTest() throws BackendException {
+        store.insert(KeyValueStoreUtil.getBuffer(0), KeyValueStoreUtil.getBuffer("test"), tx);
+        StaticBuffer output = store.get(KeyValueStoreUtil.getBuffer(0), tx);
+        assertEquals(0, KeyValueStoreUtil.getBuffer("test").compareTo(output));
     }
 }

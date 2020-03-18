@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.janusgraph.diskstorage.BackendException;
@@ -207,44 +206,14 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     public synchronized Map<KVQuery, List<KeyValue>> getMultiRange(final List<FoundationDBRangeQuery> queries)
         throws PermanentBackendException {
         Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();
-        final List<FoundationDBRangeQuery> retries = new CopyOnWriteArrayList<>(queries);
-        final List<CompletableFuture<List<KeyValue>>> futures = new LinkedList<>();
-        for (int i = 0; i < (maxRuns * 5); i++) {
-            for (FoundationDBRangeQuery query : retries) {
 
-                final int startTxId = txCtr.get();
-                try {
-                    futures.add(
-                        tx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
-                            .asList()
-                            .whenComplete((res, th) -> {
-                                if (th == null) {
-                                    retries.remove(query);
-                                    if (res == null) {
-                                        res = Collections.emptyList();
-                                    }
-                                    resultMap.put(query.asKVQuery(), res);
-                                } else {
-                                    if (startTxId == txCtr.get())
-                                        this.restart();
-                                }
-                            }));
-                } catch (IllegalStateException fdbe) {
-                    // retry on IllegalStateException thrown when tx state changes prior to getRange
-                    // call
-                }
-            }
-        }
-        for (final CompletableFuture<List<KeyValue>> future : futures) {
-            try {
-                future.get();
-            } catch (ExecutionException ee) {
-                // some tasks will fail due to tx time limits being exceeded
-            } catch (IllegalStateException is) {
-                // illegal state can arise from tx being closed while tx is inflight
-            } catch (Exception e) {
-                throw new PermanentBackendException(e);
-            }
+        for (FoundationDBRangeQuery query : queries) {
+            resultMap.put(
+                query.asKVQuery(),
+                runWithRetries(
+                    readTx
+                    -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
+                           .asList()));
         }
 
         return resultMap;
