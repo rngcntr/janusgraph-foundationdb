@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -169,51 +170,32 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public byte[] get(final byte[] key) throws PermanentBackendException {
-        return runWithRetries(readTx -> readTx.get(key));
-    }
-
-    private interface RetriableOperation<T> {
-        public CompletableFuture<T> read(ReadTransaction readTx) throws ExecutionException;
-    }
-
-    private <T> T runWithRetries (RetriableOperation<T> operation) throws PermanentBackendException {
-        for (int i = 0; i < maxRuns; i++) {
-            final int startTxId = txCtr.get();
-
-            ReadTransaction readTx = isolationLevel == IsolationLevel.SERIALIZABLE ? tx : tx.snapshot();
-
-            try {
-                return operation.read(readTx).get();
-            } catch (ExecutionException e) {
-                if (txCtr.get() == startTxId) {
-                    this.restart();
-                }
-            } catch (Exception e) {
-                throw new PermanentBackendException(e);
-            }
-        }
-
-        throw new PermanentBackendException("Max transaction reset count exceeded");
+        return waitForFuture(runWithRetriesAsync(readTx -> readTx.get(key)));
     }
 
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
         throws PermanentBackendException {
-        List<KeyValue> result = runWithRetries(
-            readTx -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList());
+        List<KeyValue> result = waitForFuture(runWithRetriesAsync(
+            readTx
+            -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList()));
         return result != null ? result : Collections.emptyList();
     }
 
-    public synchronized Map<KVQuery, List<KeyValue>> getMultiRange(final List<FoundationDBRangeQuery> queries)
-        throws PermanentBackendException {
-        Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();
-
+    public synchronized Map<KVQuery, List<KeyValue>>
+    getMultiRange(final List<FoundationDBRangeQuery> queries) throws PermanentBackendException {
+        Map<KVQuery, CompletableFuture<List<KeyValue>>> futureMap = new ConcurrentHashMap<>();
         for (FoundationDBRangeQuery query : queries) {
-            resultMap.put(
+            futureMap.put(
                 query.asKVQuery(),
-                runWithRetries(
+                runWithRetriesAsync(
                     readTx
                     -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
                            .asList()));
+        }
+
+        Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();
+        for (Entry<KVQuery, CompletableFuture<List<KeyValue>>> entry : futureMap.entrySet()) {
+            resultMap.put(entry.getKey(), waitForFuture(entry.getValue()));
         }
 
         return resultMap;
@@ -243,5 +225,41 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         public byte[] getKey() { return this.key; }
 
         public byte[] getValue() { return this.value; }
+    }
+
+    private interface RetriableOperation<T> {
+        public CompletableFuture<T> read(ReadTransaction readTx);
+    }
+
+    private <T> T waitForFuture(CompletableFuture<T> future) throws PermanentBackendException {
+        try {
+            return future.get();
+        } catch (ExecutionException eex) {
+            throw new PermanentBackendException("Max transaction reset count exceeded");
+        } catch (InterruptedException e) {
+            throw new PermanentBackendException(
+                "Interrupted while waiting for FoundationDB result");
+        }
+    }
+
+    private <T> CompletableFuture<T> runWithRetriesAsync(RetriableOperation<T> operation) {
+        int[] startTxId = {txCtr.get()};
+        CompletableFuture<T> future = operation.read(getReadTransaction());
+
+        for (int i = 0; i < maxRuns; ++i) {
+            future = future.exceptionally(th -> {
+                if (txCtr.get() == startTxId[0]) {
+                    this.restart();
+                }
+                startTxId[0] = txCtr.get();
+                return operation.read(getReadTransaction()).join();
+            });
+        }
+
+        return future;
+    }
+
+    private ReadTransaction getReadTransaction() {
+        return isolationLevel == IsolationLevel.SERIALIZABLE ? tx : tx.snapshot();
     }
 }
