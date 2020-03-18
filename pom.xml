@@ -17,6 +17,7 @@
         <foundationdb.version>6.2.10</foundationdb.version>
         <dependency.plugin.version>2.10</dependency.plugin.version>
         <testcontainers.version>1.13.0</testcontainers.version>
+        <slf4j.version>1.7.25</slf4j.version>
         <test.skip.default>false</test.skip.default>
         <test.skip.tp>true</test.skip.tp>
     </properties>
@@ -83,6 +84,11 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency> 
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
