@@ -140,9 +140,11 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
                 do {
                     candidate = entries.next();
                     key = getBuffer(db.unpack(candidate.getKey()).getBytes(0));
-                } while (!selector.include(key));
+                } while (!selector.include(key) && entries.hasNext());
 
-                return new KeyValueEntry(key, getBuffer(candidate.getValue()));
+                if (selector.include(key)) {
+                    return new KeyValueEntry(key, getBuffer(candidate.getValue()));
+                }
             }
 
             return null;
