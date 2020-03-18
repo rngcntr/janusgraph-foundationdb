@@ -19,10 +19,10 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.PermanentBackendException;
 import org.janusgraph.diskstorage.StaticBuffer;
@@ -42,12 +42,6 @@ import org.slf4j.LoggerFactory;
 public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
 
     private static final Logger log = LoggerFactory.getLogger(FoundationDBKeyValueStore.class);
-
-    private static final StaticBuffer.Factory<byte[]> ENTRY_FACTORY = (array, offset, limit) -> {
-        final byte[] bArray = new byte[limit - offset];
-        System.arraycopy(array, offset, bArray, 0, limit - offset);
-        return bArray;
-    };
 
     private final DirectorySubspace db;
     private final String name;
@@ -84,7 +78,7 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
     public StaticBuffer get(StaticBuffer key, StoreTransaction txh) throws BackendException {
         FoundationDBTx tx = getTransaction(txh);
         try {
-            byte[] databaseKey = db.pack(key.as(ENTRY_FACTORY));
+            byte[] databaseKey = db.pack(key.as(FoundationDBRangeQuery.ENTRY_FACTORY));
             log.trace("db={}, op=get, tx={}", name, txh);
             final byte[] entry = tx.get(databaseKey);
             if (entry != null) {
@@ -115,17 +109,14 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         throws BackendException {
         log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         final FoundationDBTx tx = getTransaction(txh);
-        final StaticBuffer keyStart = query.getStart();
-        final StaticBuffer keyEnd = query.getEnd();
-        final KeySelector selector = query.getKeySelector();
         final List<KeyValueEntry> result = new ArrayList<>();
-        final byte[] foundKey = db.pack(keyStart.as(ENTRY_FACTORY));
-        final byte[] endKey = db.pack(keyEnd.as(ENTRY_FACTORY));
+
+        final FoundationDBRangeQuery fdbQuery = new FoundationDBRangeQuery(db, query);
 
         try {
-            final List<KeyValue> results = tx.getRange(foundKey, endKey, query.getLimit());
+            final List<KeyValue> results = tx.getRange(fdbQuery);
             log.trace("db={}, op=getSlice, tx={}, resultcount={}", name, txh, result.size());
-            return new FoundationDBRecordIterator(results, selector);
+            return new FoundationDBRecordIterator(results, query.getKeySelector());
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
@@ -187,17 +178,8 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         final Map<KVQuery, RecordIterator<KeyValueEntry>> resultMap = new ConcurrentHashMap<>();
 
         try {
-            final List<Object[]> preppedQueries = new LinkedList<>();
-
-            for (final KVQuery query : queries) {
-                final StaticBuffer keyStart = query.getStart();
-                final StaticBuffer keyEnd = query.getEnd();
-                final byte[] foundKey = db.pack(keyStart.as(ENTRY_FACTORY));
-                final byte[] endKey = db.pack(keyEnd.as(ENTRY_FACTORY));
-                preppedQueries.add(new Object[] {query, foundKey, endKey});
-            }
-
-            final Map<KVQuery, List<KeyValue>> result = tx.getMultiRange(preppedQueries);
+            final List<FoundationDBRangeQuery> fdbQueries = queries.stream().map(q -> new FoundationDBRangeQuery(db, q)).collect(Collectors.toList());
+            final Map<KVQuery, List<KeyValue>> result = tx.getMultiRange(fdbQueries);
 
             for (Map.Entry<KVQuery, List<KeyValue>> entry : result.entrySet()) {
                 resultMap.put(entry.getKey(),
@@ -221,9 +203,8 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
                        boolean allowOverwrite) throws BackendException {
         FoundationDBTx tx = getTransaction(txh);
         try {
-
             log.trace("db={}, op=insert, tx={}", name, txh);
-            tx.set(db.pack(key.as(ENTRY_FACTORY)), value.as(ENTRY_FACTORY));
+            tx.set(db.pack(key.as(FoundationDBRangeQuery.ENTRY_FACTORY)), value.as(FoundationDBRangeQuery.ENTRY_FACTORY));
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
@@ -235,7 +216,7 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         FoundationDBTx tx = getTransaction(txh);
         try {
             log.trace("db={}, op=delete, tx={}", name, txh);
-            tx.clear(db.pack(key.as(ENTRY_FACTORY)));
+            tx.clear(db.pack(key.as(FoundationDBRangeQuery.ENTRY_FACTORY)));
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }

@@ -2,7 +2,6 @@ package com.experoinc.janusgraph.diskstorage.foundationdb;
 
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.KeyValue;
-import com.apple.foundationdb.Range;
 import com.apple.foundationdb.Transaction;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -170,29 +169,22 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public byte[] get(final byte[] key) throws PermanentBackendException {
-        for (int i = 0; i < maxRuns; i++) {
-            try {
-                return this.tx.get(key).get();
-            } catch (ExecutionException e) {
-                this.restart();
-            } catch (Exception e) {
-                throw new PermanentBackendException(e);
-            }
-        }
-
-        throw new PermanentBackendException("Max transaction reset count exceeded");
+        return runWithRetries(() -> this.tx.get(key));
     }
 
-    public List<KeyValue> getRange(final byte[] startKey, final byte[] endKey, final int limit)
-        throws PermanentBackendException {
+    private interface RetriableOperation<T> {
+        public CompletableFuture<T> apply() throws ExecutionException;
+    }
+
+    private <T> T runWithRetries (RetriableOperation<T> operation) throws PermanentBackendException {
         for (int i = 0; i < maxRuns; i++) {
             final int startTxId = txCtr.get();
             try {
-                List<KeyValue> result = tx.getRange(new Range(startKey, endKey), limit).asList().get();
-                return result != null ? result : Collections.emptyList();
+                return operation.apply().get();
             } catch (ExecutionException e) {
-                if (txCtr.get() == startTxId)
+                if (txCtr.get() == startTxId) {
                     this.restart();
+                }
             } catch (Exception e) {
                 throw new PermanentBackendException(e);
             }
@@ -201,33 +193,38 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         throw new PermanentBackendException("Max transaction reset count exceeded");
     }
 
-    public synchronized Map<KVQuery, List<KeyValue>> getMultiRange(final List<Object[]> queries)
+    public List<KeyValue> getRange(final FoundationDBRangeQuery query)
+        throws PermanentBackendException {
+        List<KeyValue> result = runWithRetries(
+            () -> tx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList());
+        return result != null ? result : Collections.emptyList();
+    }
+
+    public synchronized Map<KVQuery, List<KeyValue>> getMultiRange(final List<FoundationDBRangeQuery> queries)
         throws PermanentBackendException {
         Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();
-        final List<Object[]> retries = new CopyOnWriteArrayList<>(queries);
+        final List<FoundationDBRangeQuery> retries = new CopyOnWriteArrayList<>(queries);
         final List<CompletableFuture<List<KeyValue>>> futures = new LinkedList<>();
         for (int i = 0; i < (maxRuns * 5); i++) {
-            for (Object[] obj : retries) {
-                final KVQuery query = (KVQuery) obj[0];
-                final byte[] start = (byte[]) obj[1];
-                final byte[] end = (byte[]) obj[2];
+            for (FoundationDBRangeQuery query : retries) {
 
                 final int startTxId = txCtr.get();
                 try {
-                    futures.add(tx.getRange(start, end, query.getLimit())
-                                    .asList()
-                                    .whenComplete((res, th) -> {
-                                        if (th == null) {
-                                            retries.remove(obj);
-                                            if (res == null) {
-                                                res = Collections.emptyList();
-                                            }
-                                            resultMap.put(query, res);
-                                        } else {
-                                            if (startTxId == txCtr.get())
-                                                this.restart();
-                                        }
-                                    }));
+                    futures.add(
+                        tx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
+                            .asList()
+                            .whenComplete((res, th) -> {
+                                if (th == null) {
+                                    retries.remove(query);
+                                    if (res == null) {
+                                        res = Collections.emptyList();
+                                    }
+                                    resultMap.put(query.asKVQuery(), res);
+                                } else {
+                                    if (startTxId == txCtr.get())
+                                        this.restart();
+                                }
+                            }));
                 } catch (IllegalStateException fdbe) {
                     // retry on IllegalStateException thrown when tx state changes prior to getRange
                     // call
