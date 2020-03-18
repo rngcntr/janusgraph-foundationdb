@@ -2,6 +2,7 @@ package com.experoinc.janusgraph.diskstorage.foundationdb;
 
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.KeyValue;
+import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -169,18 +170,21 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public byte[] get(final byte[] key) throws PermanentBackendException {
-        return runWithRetries(() -> this.tx.get(key));
+        return runWithRetries(readTx -> readTx.get(key));
     }
 
     private interface RetriableOperation<T> {
-        public CompletableFuture<T> apply() throws ExecutionException;
+        public CompletableFuture<T> read(ReadTransaction readTx) throws ExecutionException;
     }
 
     private <T> T runWithRetries (RetriableOperation<T> operation) throws PermanentBackendException {
         for (int i = 0; i < maxRuns; i++) {
             final int startTxId = txCtr.get();
+
+            ReadTransaction readTx = isolationLevel == IsolationLevel.SERIALIZABLE ? tx : tx.snapshot();
+
             try {
-                return operation.apply().get();
+                return operation.read(readTx).get();
             } catch (ExecutionException e) {
                 if (txCtr.get() == startTxId) {
                     this.restart();
@@ -196,7 +200,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
         throws PermanentBackendException {
         List<KeyValue> result = runWithRetries(
-            () -> tx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList());
+            readTx -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList());
         return result != null ? result : Collections.emptyList();
     }
 
