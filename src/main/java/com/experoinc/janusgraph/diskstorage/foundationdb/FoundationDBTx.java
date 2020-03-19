@@ -246,7 +246,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         int[] startTxId = {txCtr.get()};
         CompletableFuture<T> future = operation.read(getReadTransaction());
 
-        for (int i = 0; i < maxRuns; ++i) {
+        for (int i = 1; i < maxRuns; ++i) {
             future = future.exceptionally(th -> {
                 if (txCtr.get() == startTxId[0]) {
                     this.restart();
