@@ -35,7 +35,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private List<Insert> inserts = new LinkedList<>();
     private List<byte[]> deletions = new LinkedList<>();
 
-    private int maxRuns = 1;
+    private long maxRuns = 1;
 
     public enum IsolationLevel { SERIALIZABLE, READ_COMMITTED_NO_WRITE, READ_COMMITTED_WITH_WRITE }
 
@@ -44,7 +44,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private AtomicInteger txCtr = new AtomicInteger(0);
 
     public FoundationDBTx(Database db, Transaction t, BaseTransactionConfig config,
-                          IsolationLevel isolationLevel) {
+                          IsolationLevel isolationLevel, long maxRuns) {
         super(config);
         tx = t;
         this.db = db;
@@ -52,10 +52,10 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
         switch (isolationLevel) {
         case SERIALIZABLE:
-            break; // no retries
+            this.maxRuns = 1;
         case READ_COMMITTED_NO_WRITE:
         case READ_COMMITTED_WITH_WRITE:
-            maxRuns = 3;
+            this.maxRuns = maxRuns;
         }
     }
 

@@ -63,6 +63,7 @@ public class FoundationDBStoreManager
     private DirectorySubspace rootDirectory;
     private final String rootDirectoryName;
     private final FoundationDBTx.IsolationLevel isolationLevel;
+    private long retryCount;
 
     public FoundationDBStoreManager(Configuration configuration) throws BackendException {
         super(configuration);
@@ -74,9 +75,7 @@ public class FoundationDBStoreManager
                  ? fdb.open()
                  : fdb.open(configuration.get(CLUSTER_FILE_PATH));
 
-        // the following options are currently unused but may be used in the future
-        db.options().setTransactionTimeout(configuration.get(TRANSACTION_TIMEOUT));
-        db.options().setTransactionRetryLimit(configuration.get(TRANSACTION_RETRIES));
+        retryCount = configuration.get(TRANSACTION_RETRIES);
 
         try {
             isolationLevel = FoundationDBTx.IsolationLevel.valueOf(
@@ -125,7 +124,8 @@ public class FoundationDBStoreManager
         throws BackendException {
         try {
             final Transaction tx = db.createTransaction();
-            final StoreTransaction fdbTx = new FoundationDBTx(db, tx, txCfg, isolationLevel);
+            final StoreTransaction fdbTx =
+                new FoundationDBTx(db, tx, txCfg, isolationLevel, retryCount);
 
             if (log.isTraceEnabled()) {
                 log.trace("FoundationDB tx created", new TransactionBegin(fdbTx.toString()));
