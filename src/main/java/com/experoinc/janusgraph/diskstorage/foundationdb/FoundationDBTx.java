@@ -53,6 +53,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         switch (isolationLevel) {
         case SERIALIZABLE:
             this.maxRuns = 1;
+            break;
         case READ_COMMITTED_NO_WRITE:
         case READ_COMMITTED_WITH_WRITE:
             this.maxRuns = maxRuns;
@@ -133,6 +134,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
             try {
                 if (!inserts.isEmpty() || !deletions.isEmpty()) {
+                    System.out.println("Approximate size of transaction: " + tx.getApproximateSize().get());
                     tx.commit().get();
                 } else {
                     // nothing to commit so skip it
@@ -143,10 +145,12 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                 failing = false;
                 break;
             } catch (IllegalStateException | ExecutionException e) {
+                e.printStackTrace();
                 if (isolationLevel.equals(IsolationLevel.SERIALIZABLE) ||
                     isolationLevel.equals(IsolationLevel.READ_COMMITTED_NO_WRITE)) {
                     break;
                 }
+                System.out.println("restarting " + this.toString());
                 restart();
             } catch (Exception e) {
                 throw new PermanentBackendException(e);
@@ -249,6 +253,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         for (int i = 1; i < maxRuns; ++i) {
             future = future.exceptionally(th -> {
                 if (txCtr.get() == startTxId[0]) {
+                    System.out.println("restarting after failed read (maxRuns = " + maxRuns + ") " + this.toString());
                     this.restart();
                 }
                 startTxId[0] = txCtr.get();

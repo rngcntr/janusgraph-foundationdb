@@ -13,22 +13,23 @@
 package com.experoinc.janusgraph.diskstorage.foundationdb.isolation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBStoreManager;
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.keycolumnvalue.StoreTransaction;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * @author Florian Grieskamp (Florian.Grieskamp@gdata.de)
  */
-public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
+@Testcontainers
+public class FoundationDBReadCommittedNoWriteTest extends FoundationDBIsolationTest {
 
     @Override
     protected String getIsolationLevel() {
-        return "serializable";
+        return "read_committed_no_write";
     }
 
     @Test
@@ -46,11 +47,9 @@ public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
     }
 
     @Test
-    public void longReadWriteFailWithMaxRetries() throws BackendException {
+    public void longReadWriteSucceedWithoutException() throws BackendException {
         StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        assertThrows(BackendException.class, () -> {
-            doLongRunningReadInsert(tx);
-            tx.commit();
-        });
+        doLongRunningReadInsert(tx);
+        tx.commit();
     }
 }
