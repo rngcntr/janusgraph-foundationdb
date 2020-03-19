@@ -23,6 +23,7 @@ import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.directory.PathUtil;
+import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx.IsolationLevel;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +98,10 @@ public class FoundationDBStoreManager
                        .optimisticLocking(true)
                        .multiQuery(true)
                        .build();
+    }
+
+    public IsolationLevel getIsolationLevel() {
+        return isolationLevel;
     }
 
     private void initialize(final String directoryName) throws BackendException {
