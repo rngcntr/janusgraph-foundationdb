@@ -19,7 +19,7 @@ public class FoundationDBRangeQuery {
     private byte[] startKey;
     private byte[] endKey;
     private int limit;
-    
+
     public FoundationDBRangeQuery(Subspace db, KVQuery kvQuery) {
         originalQuery = kvQuery;
         startKey = db.pack(kvQuery.getStart().as(FoundationDBRangeQuery.ENTRY_FACTORY));
@@ -27,19 +27,11 @@ public class FoundationDBRangeQuery {
         limit = kvQuery.getLimit();
     }
 
-    public KVQuery asKVQuery() {
-        return originalQuery;
-    }
+    public KVQuery asKVQuery() { return originalQuery; }
 
-    public byte[] getStartKey() {
-        return startKey;
-    }
+    public byte[] getStartKey() { return startKey; }
 
-    public byte[] getEndKey() {
-        return endKey;
-    }
+    public byte[] getEndKey() { return endKey; }
 
-    public int getLimit() {
-        return limit;
-    }
+    public int getLimit() { return limit; }
 }

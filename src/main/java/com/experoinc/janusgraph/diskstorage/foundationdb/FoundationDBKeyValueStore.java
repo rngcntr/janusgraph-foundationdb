@@ -180,7 +180,10 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         final Map<KVQuery, RecordIterator<KeyValueEntry>> resultMap = new ConcurrentHashMap<>();
 
         try {
-            final List<FoundationDBRangeQuery> fdbQueries = queries.stream().map(q -> new FoundationDBRangeQuery(db, q)).collect(Collectors.toList());
+            final List<FoundationDBRangeQuery> fdbQueries =
+                queries.stream()
+                    .map(q -> new FoundationDBRangeQuery(db, q))
+                    .collect(Collectors.toList());
             final Map<KVQuery, List<KeyValue>> result = tx.getMultiRange(fdbQueries);
 
             for (Map.Entry<KVQuery, List<KeyValue>> entry : result.entrySet()) {
@@ -206,7 +209,8 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         FoundationDBTx tx = getTransaction(txh);
         try {
             log.trace("db={}, op=insert, tx={}", name, txh);
-            tx.set(db.pack(key.as(FoundationDBRangeQuery.ENTRY_FACTORY)), value.as(FoundationDBRangeQuery.ENTRY_FACTORY));
+            tx.set(db.pack(key.as(FoundationDBRangeQuery.ENTRY_FACTORY)),
+                   value.as(FoundationDBRangeQuery.ENTRY_FACTORY));
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
