@@ -52,7 +52,7 @@ Follow these steps if you'd like to use the latest version built from source.
 |Property|Description|Default|
 |-|-|-|
 |`storage.fdb.directory`|Name of the JanusGraph storage directory in FoundationDB.|`janusgraph`|
-|`storage.fdb.version`|The FoundationDB client version.|`5.2.0`|
+|`storage.fdb.version`|The FoundationDB client version.|`6.2.18`|
 |`storage.fdb.cluster-file-path`|The location of the `fdb.cluster` file.|`/etc/foundationdb/fdb.cluster`|
 |`storage.fdb.isolation-level`|The three options are `serializable`, `read_committed_no_write`, and `read_committed_with_write`.|`serializable`|
 
