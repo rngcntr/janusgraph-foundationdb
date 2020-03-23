@@ -1,5 +1,7 @@
 package com.experoinc.janusgraph.diskstorage.foundationdb;
 
+import static java.util.AbstractMap.SimpleEntry;
+
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.ReadTransaction;
@@ -33,7 +35,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     private final Database db;
 
-    private List<Insert> inserts = new LinkedList<>();
+    private List<SimpleEntry<byte[], byte[]>> inserts = new LinkedList<>();
     private List<byte[]> deletions = new LinkedList<>();
 
     private long maxRuns = 1;
@@ -214,27 +216,13 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public void set(final byte[] key, final byte[] value) {
-        inserts.add(new Insert(key, value));
+        inserts.add(new SimpleEntry<byte[], byte[]>(key, value));
         tx.set(key, value);
     }
 
     public void clear(final byte[] key) {
         deletions.add(key);
         tx.clear(key);
-    }
-
-    private class Insert {
-        private byte[] key;
-        private byte[] value;
-
-        public Insert(final byte[] key, final byte[] value) {
-            this.key = key;
-            this.value = value;
-        }
-
-        public byte[] getKey() { return this.key; }
-
-        public byte[] getValue() { return this.value; }
     }
 
     private interface RetriableOperation<T> {

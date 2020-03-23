@@ -12,6 +12,7 @@
 
 package com.experoinc.janusgraph.diskstorage.foundationdb.isolation;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBStoreManager;
@@ -36,20 +37,25 @@ public class FoundationDBReadCommittedNoWriteTest extends FoundationDBIsolationT
     @Override
     public void testIsolationLevel() throws BackendException {
         FoundationDBStoreManager fdbManager = (FoundationDBStoreManager) manager;
-        assertEquals(fdbManager.getIsolationLevel(), FoundationDBTx.IsolationLevel.SERIALIZABLE);
+        assertEquals(FoundationDBTx.IsolationLevel.READ_COMMITTED_NO_WRITE,
+                     fdbManager.getIsolationLevel());
     }
 
     @Test
     public void longReadSucceedWithoutException() throws BackendException {
-        StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        doLongRunningRead(tx);
-        tx.commit();
+        assertDoesNotThrow(() -> {
+            StoreTransaction tx = manager.beginTransaction(getTxConfig());
+            doLongRunningRead(tx);
+            tx.commit();
+        });
     }
 
     @Test
     public void longReadWriteSucceedWithoutException() throws BackendException {
-        StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        doLongRunningReadInsert(tx);
-        tx.commit();
+        assertDoesNotThrow(() -> {
+            StoreTransaction tx = manager.beginTransaction(getTxConfig());
+            doLongRunningReadInsert(tx);
+            tx.commit();
+        });
     }
 }
