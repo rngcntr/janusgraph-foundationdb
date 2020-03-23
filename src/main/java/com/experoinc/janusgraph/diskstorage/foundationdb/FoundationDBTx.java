@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,6 +43,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private final IsolationLevel isolationLevel;
 
     private AtomicInteger txCtr = new AtomicInteger(0);
+    private boolean hasCompletedReadOperation = false;
 
     public FoundationDBTx(Database db, Transaction t, BaseTransactionConfig config,
                           IsolationLevel isolationLevel, long maxRuns) {
@@ -60,7 +62,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         }
     }
 
-    public synchronized void restart() {
+    public synchronized void restart() throws PermanentBackendException {
         txCtr.incrementAndGet();
         if (tx == null) {
             return;
@@ -74,6 +76,12 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             tx.close();
         }
 
+        if (isolationLevel == IsolationLevel.SERIALIZABLE && hasCompletedReadOperation) {
+            // only retry this transaction if it has not exposed any data yet
+            throw new PermanentBackendException(
+                "Transaction can not be retried because of earlier successful read");
+        }
+
         tx = db.createTransaction();
 
         // Reapply mutations but do not clear them out just in case this transaction also
@@ -83,12 +91,10 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         // is not handled.
 
         inserts.forEach(insert -> {
-            tx.addReadConflictKey(insert.getKey());
             tx.set(insert.getKey(), insert.getValue());
         });
 
         deletions.forEach(delete -> {
-            tx.addReadConflictKey(delete);
             tx.clear(delete);
         });
     }
@@ -172,14 +178,17 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public byte[] get(final byte[] key) throws PermanentBackendException {
-        return waitForFuture(runWithRetriesAsync(readTx -> readTx.get(key)));
+        byte[] result = waitForFuture(readWithRetriesAsync(readTx -> readTx.get(key)));
+        hasCompletedReadOperation = true;
+        return result;
     }
 
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
         throws PermanentBackendException {
-        List<KeyValue> result = waitForFuture(runWithRetriesAsync(
+        List<KeyValue> result = waitForFuture(readWithRetriesAsync(
             readTx
             -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList()));
+        hasCompletedReadOperation = true;
         return result != null ? result : Collections.emptyList();
     }
 
@@ -189,7 +198,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         for (FoundationDBRangeQuery query : queries) {
             futureMap.put(
                 query.asKVQuery(),
-                runWithRetriesAsync(
+                readWithRetriesAsync(
                     readTx
                     -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
                            .asList()));
@@ -200,18 +209,17 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             resultMap.put(entry.getKey(), waitForFuture(entry.getValue()));
         }
 
+        hasCompletedReadOperation = true;
         return resultMap;
     }
 
     public void set(final byte[] key, final byte[] value) {
         inserts.add(new Insert(key, value));
-        tx.addReadConflictKey(key);
         tx.set(key, value);
     }
 
     public void clear(final byte[] key) {
         deletions.add(key);
-        tx.addReadConflictKey(key);
         tx.clear(key);
     }
 
@@ -244,14 +252,19 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         }
     }
 
-    private <T> CompletableFuture<T> runWithRetriesAsync(RetriableOperation<T> operation) {
+    private <T> CompletableFuture<T> readWithRetriesAsync(RetriableOperation<T> operation)
+        throws PermanentBackendException {
         int[] startTxId = {txCtr.get()};
         CompletableFuture<T> future = operation.read(getReadTransaction());
 
         for (int i = 1; i < maxRuns; ++i) {
             future = future.exceptionally(th -> {
                 if (txCtr.get() == startTxId[0]) {
-                    this.restart();
+                    try {
+                        this.restart();
+                    } catch (PermanentBackendException pbex) {
+                        throw new CompletionException(pbex);
+                    }
                 }
                 startTxId[0] = txCtr.get();
                 return operation.read(getReadTransaction()).join();

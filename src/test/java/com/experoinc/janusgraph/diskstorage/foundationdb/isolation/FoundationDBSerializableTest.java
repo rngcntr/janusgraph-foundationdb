@@ -35,14 +35,16 @@ public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
     @Override
     public void testIsolationLevel() throws BackendException {
         FoundationDBStoreManager fdbManager = (FoundationDBStoreManager) manager;
-        assertEquals(fdbManager.getIsolationLevel(), FoundationDBTx.IsolationLevel.SERIALIZABLE);
+        assertEquals(FoundationDBTx.IsolationLevel.SERIALIZABLE, fdbManager.getIsolationLevel());
     }
 
     @Test
-    public void longReadSucceedWithoutException() throws BackendException {
+    public void longReadFailWithNoRetriesAllowed() throws BackendException {
         StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        doLongRunningRead(tx);
-        tx.commit();
+        assertThrows(BackendException.class, () -> {
+            doLongRunningRead(tx);
+            tx.commit();
+        });
     }
 
     @Test

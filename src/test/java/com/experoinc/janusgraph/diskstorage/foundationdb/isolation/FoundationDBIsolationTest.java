@@ -54,25 +54,20 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
         close();
     }
 
-    @Test public abstract void testIsolationLevel() throws BackendException;
+    public abstract void testIsolationLevel() throws BackendException;
 
     @Test
     public void testIsolateTransactions() throws BackendException, InterruptedException {
         Thread t1 = new Thread(() -> {
             try {
                 StoreTransaction tx = manager.beginTransaction(getTxConfig());
-                System.out.println("thread1 a");
                 Thread.sleep(500);
-                System.out.println("thread1 b");
                 insert(0, "thread 1 old", tx);
                 Thread.sleep(1000);
-                System.out.println("thread1 c");
                 assertEquals("thread 1 old", get(0, tx));
                 Thread.sleep(1000);
-                System.out.println("thread1 d");
                 insert(0, "thread 1 new", tx);
                 Thread.sleep(1000);
-                System.out.println("thread1 e");
                 assertEquals("thread 1 new", get(0, tx));
                 tx.commit();
             } catch (Exception ignored) {
@@ -81,18 +76,13 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
         Thread t2 = new Thread(() -> {
             try {
                 StoreTransaction tx = manager.beginTransaction(getTxConfig());
-                System.out.println("thread2 a");
                 Thread.sleep(1000);
-                System.out.println("thread2 b");
                 insert(0, "thread 2 old", tx);
                 Thread.sleep(1000);
-                System.out.println("thread2 c");
                 assertEquals("thread 2 old", get(0, tx));
                 Thread.sleep(1000);
-                System.out.println("thread2 d");
                 insert(0, "thread 2 new", tx);
                 Thread.sleep(1000);
-                System.out.println("thread2 e");
                 assertEquals("thread 2 new", get(0, tx));
                 tx.commit();
             } catch (Exception ignored) {
@@ -136,11 +126,10 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
     public void doLongRunningRead(StoreTransaction tx) throws BackendException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
-        while (System.currentTimeMillis() < startTime + 6000) {
+        while (System.currentTimeMillis() < startTime + 10000) {
             contains(counter, tx);
             ++counter;
         }
-        System.out.println(counter);
     }
 
     public void doLongRunningReadInsert(StoreTransaction tx) throws BackendException {
@@ -151,6 +140,5 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
             insert(counter, String.valueOf(1), tx);
             counter += Integer.parseInt(getFirstOfRange(0, counter + 1, tx));
         }
-        System.out.println(counter);
     }
 }
