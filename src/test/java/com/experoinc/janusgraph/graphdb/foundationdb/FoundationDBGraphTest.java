@@ -14,29 +14,22 @@
 
 package com.experoinc.janusgraph.graphdb.foundationdb;
 
+import static org.junit.Assert.*;
+
 import com.experoinc.janusgraph.FoundationDBContainer;
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
-import org.apache.tinkerpop.gremlin.structure.Vertex;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import org.janusgraph.core.JanusGraphException;
 import org.janusgraph.core.JanusGraphFactory;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.LongStream;
-
-import static org.junit.Assert.*;
 
 /**
  * @author Ted Wilmes (twilmes@gmail.com)
@@ -70,13 +63,6 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     }
 
     @Test
-    @Disabled
-    @Override
-    public void testClearStorage() throws Exception {
-
-    }
-
-    @Test
     @Override
     public void testConsistencyEnforcement() {
         // Isolation must be set to serializable for this to work properly
@@ -105,13 +91,6 @@ public class FoundationDBGraphTest extends JanusGraphTest {
         open(config);
 
         assertEquals(0L, (long) graph.traversal().V().count().next());
-    }
-
-    @Test
-    @Disabled
-    @Override
-    public void testLargeJointIndexRetrieval() {
-        // disabled because exceeds FDB transaction commit limit
     }
 
     @Test

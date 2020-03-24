@@ -97,6 +97,8 @@ public class FoundationDBStoreManager
                        .supportsInterruption(false)
                        .optimisticLocking(true)
                        .multiQuery(true)
+                       .cellTTL(false)
+                       .storeTTL(false)
                        .build();
     }
 
