@@ -16,9 +16,9 @@ package com.experoinc.janusgraph.diskstorage.foundationdb;
 
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.directory.DirectorySubspace;
+import com.experoinc.janusgraph.diskstorage.FoundationDBRecordIterator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +28,6 @@ import org.janusgraph.diskstorage.PermanentBackendException;
 import org.janusgraph.diskstorage.StaticBuffer;
 import org.janusgraph.diskstorage.keycolumnvalue.StoreTransaction;
 import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.KVQuery;
-import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.KeySelector;
 import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.KeyValueEntry;
 import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.OrderedKeyValueStore;
 import org.janusgraph.diskstorage.util.RecordIterator;
@@ -116,58 +115,9 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         try {
             final List<KeyValue> results = tx.getRange(fdbQuery);
             log.trace("db={}, op=getSlice, tx={}, resultcount={}", name, txh, result.size());
-            return new FoundationDBRecordIterator(results, query.getKeySelector());
+            return new FoundationDBRecordIterator(db, results, query.getKeySelector());
         } catch (Exception e) {
             throw new PermanentBackendException(e);
-        }
-    }
-
-    private class FoundationDBRecordIterator implements RecordIterator<KeyValueEntry> {
-        private final Iterator<KeyValue> entries;
-        private final KeySelector selector;
-        private KeyValueEntry nextEntry;
-
-        public FoundationDBRecordIterator(final List<KeyValue> result, KeySelector selector) {
-            this.entries = result.iterator();
-            this.selector = selector;
-            nextEntry = findNextEntry();
-        }
-
-        private KeyValueEntry findNextEntry() {
-            while (entries.hasNext()) {
-                KeyValue candidate;
-                StaticBuffer key;
-                do {
-                    candidate = entries.next();
-                    key = getBuffer(db.unpack(candidate.getKey()).getBytes(0));
-                } while (!selector.include(key) && entries.hasNext());
-
-                if (selector.include(key)) {
-                    return new KeyValueEntry(key, getBuffer(candidate.getValue()));
-                }
-            }
-
-            return null;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return nextEntry != null;
-        }
-
-        @Override
-        public KeyValueEntry next() {
-            KeyValueEntry returnValue = nextEntry;
-            nextEntry = findNextEntry();
-            return returnValue;
-        }
-
-        @Override
-        public void close() {}
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
         }
     }
 
@@ -188,7 +138,7 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
 
             for (Map.Entry<KVQuery, List<KeyValue>> entry : result.entrySet()) {
                 resultMap.put(entry.getKey(),
-                              new FoundationDBRecordIterator(entry.getValue(),
+                              new FoundationDBRecordIterator(db, entry.getValue(),
                                                              entry.getKey().getKeySelector()));
             }
         } catch (Exception e) {
@@ -223,5 +173,5 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         }
     }
 
-    private static StaticBuffer getBuffer(byte[] entry) { return new StaticArrayBuffer(entry); }
+    public static StaticBuffer getBuffer(byte[] entry) { return new StaticArrayBuffer(entry); }
 }
