@@ -77,25 +77,10 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     }
 
     @Test
-    public void testVertexCentricQuerySmall() {
-        testVertexCentricQuery(1450 /*noVertices*/);
-    }
-
-    @Test
     @Override
     public void testConsistencyEnforcement() {
-        // Check that getConfiguration() explicitly set serializable isolation
-        // This could be enforced with a JUnit assertion instead of a Precondition,
-        // but a failure here indicates a problem in the test itself rather than the
-        // system-under-test, so a Precondition seems more appropriate
-        //IsolationLevel effective = ConfigOption.getEnumValue(config.get(ConfigElement.getPath(FoundationDBStoreManager.ISOLATION_LEVEL), String.class),IsolationLevel.class);
-        //Preconditions.checkState(IsolationLevel.SERIALIZABLE.equals(effective));
+        // Isolation must be set to serializable for this to work properly
         super.testConsistencyEnforcement();
-    }
-
-    @Override
-    public void testConcurrentConsistencyEnforcement() {
-        //Do nothing TODO: Figure out why this is failing in BerkeleyDB!!
     }
 
     @Test
@@ -132,35 +117,6 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     @Test
     @Override
     public void testVertexCentricQuery() {
-        // updated to not exceed FDB transaction commit limit
-        testVertexCentricQuery(1000 /*noVertices*/);
-    }
-
-    @Test
-    public void testSuperNode(){
-        GraphTraversalSource g = graph.traversal();
-
-        Vertex from = g.addV("from").property("id", 0).next();
-
-        List<Long> aList = LongStream.rangeClosed(0, 1000-1).boxed()
-                .collect(Collectors.toList());
-        aList.stream()
-                .forEach(t -> g.addV("to").property("id", t).as("to")
-                        .addE("created").from(from).to("to").property("weight", 0.4)
-                        .addV("to2").as("to2")
-                        .addE("created2").from("to").to("to2").iterate());
-
-        assertEquals(1000, g.V().has("from", "id", 0).out().out().count().next().longValue());
-    }
-
-    @Test
-    public void testDeleteNode(){
-        GraphTraversalSource g = graph.traversal();
-
-        g.addV("testVertex").property("id", 0).next();
-        assertEquals(1, g.V().count().next().longValue());
-
-        g.V().has("id", 0).drop().iterate();
-        assertEquals(0, g.V().count().next().longValue());
+        testVertexCentricQuery(100 /*noVertices*/);
     }
 }

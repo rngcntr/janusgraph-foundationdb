@@ -43,14 +43,14 @@ public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
     @Disabled
     @Override
     public void testConcurrentGetSlice() {
-
+        // one thread fails (probably with timeout), which causes the other threads to time out
     }
 
     @Test
     @Disabled
     @Override
     public void testConcurrentGetSliceAndMutate() {
-
+        // one thread fails (probably with timeout), which causes the other threads to time out
     }
     
     @Test

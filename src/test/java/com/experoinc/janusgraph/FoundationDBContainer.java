@@ -85,7 +85,7 @@ public class FoundationDBContainer extends FixedHostPortGenericContainer<Foundat
                 .set(DIRECTORY, graphName)
                 .set(DROP_ON_CLEAR, false)
                 .set(CLUSTER_FILE_PATH, clusterFile.getAbsolutePath())
-                .set(ISOLATION_LEVEL, "read_committed_with_write");
+                .set(ISOLATION_LEVEL, "serializable");
     }
 
     public WriteConfiguration getFoundationDBGraphConfiguration() {

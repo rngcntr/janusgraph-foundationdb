@@ -40,22 +40,6 @@ public class FoundationDBKeyValueTest extends KeyValueStoreTest {
     }
 
     @Test
-    public void storeAndRetrieveWithLongTransaction() throws BackendException {
-        String[] values = generateValues();
-        loadValues(values);
-        clopen();
-        checkValueExistence(values);
-
-        try {
-            Thread.sleep(6000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        checkValues(values);
-    }
-
-    @Test
     public void readYourWritesTest() throws BackendException {
         store.insert(KeyValueStoreUtil.getBuffer(0), KeyValueStoreUtil.getBuffer("test"), tx);
         StaticBuffer output = store.get(KeyValueStoreUtil.getBuffer(0), tx);

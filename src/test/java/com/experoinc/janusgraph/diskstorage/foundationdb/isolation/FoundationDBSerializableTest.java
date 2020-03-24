@@ -44,7 +44,7 @@ public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
         assertThrows(BackendException.class, () -> {
             doLongRunningRead(tx);
             tx.commit();
-        });
+        }, "Transaction can not be retried because of earlier successful read");
     }
 
     @Test
@@ -53,6 +53,6 @@ public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
         assertThrows(BackendException.class, () -> {
             doLongRunningReadInsert(tx);
             tx.commit();
-        });
+        }, "Max transaction reset count exceeded");
     }
 }

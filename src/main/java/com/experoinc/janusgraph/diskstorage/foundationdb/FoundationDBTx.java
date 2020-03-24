@@ -110,7 +110,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
         if (log.isTraceEnabled()) {
             log.trace("{} rolled back", this.toString(),
-                      new FoundationDBTx.TransactionClose(this.toString()));
+                      new FoundationDBTx.TransactionClosed(this.toString()));
         }
 
         try {
@@ -120,8 +120,9 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         } finally {
-            if (tx != null)
+            if (tx != null) {
                 tx.close();
+            }
         }
     }
 
@@ -137,7 +138,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
             if (log.isTraceEnabled()) {
                 log.trace("{} committed", this.toString(),
-                          new FoundationDBTx.TransactionClose(this.toString()));
+                          new FoundationDBTx.TransactionClosed(this.toString()));
             }
 
             try {
@@ -173,10 +174,10 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         return getClass().getSimpleName() + (null == tx ? "nulltx" : tx.toString());
     }
 
-    private static class TransactionClose extends Exception {
+    private static class TransactionClosed extends Exception {
         private static final long serialVersionUID = 1L;
 
-        private TransactionClose(String msg) { super(msg); }
+        private TransactionClosed(String msg) { super(msg); }
     }
 
     public byte[] get(final byte[] key) throws PermanentBackendException {
@@ -233,6 +234,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         try {
             return future.get();
         } catch (ExecutionException eex) {
+            eex.printStackTrace();
             throw new PermanentBackendException("Max transaction reset count exceeded");
         } catch (InterruptedException e) {
             throw new PermanentBackendException(
@@ -243,26 +245,39 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private <T> CompletableFuture<T> readWithRetriesAsync(RetriableOperation<T> operation)
         throws PermanentBackendException {
         int[] startTxId = {txCtr.get()};
-        CompletableFuture<T> future = operation.read(getReadTransaction());
+        CompletableFuture<T> future;
 
-        for (int i = 1; i < maxRuns; ++i) {
-            future = future.exceptionally(th -> {
-                if (txCtr.get() == startTxId[0]) {
-                    try {
-                        this.restart();
-                    } catch (PermanentBackendException pbex) {
-                        throw new CompletionException(pbex);
+        try {
+            future = operation.read(getReadTransaction());
+            for (int i = 1; i < maxRuns; ++i) {
+                future = future.exceptionally(th -> {
+                    if (txCtr.get() == startTxId[0]) {
+                        try {
+                            this.restart();
+                        } catch (PermanentBackendException pbex) {
+                            throw new CompletionException(pbex);
+                        }
                     }
-                }
-                startTxId[0] = txCtr.get();
-                return operation.read(getReadTransaction()).join();
-            });
+                    startTxId[0] = txCtr.get();
+                    try {
+                        return operation.read(getReadTransaction()).join();
+                    } catch (TransactionClosed tc) {
+                        throw new CompletionException(tc);
+                    }
+                });
+            }
+        } catch (TransactionClosed tc) {
+            throw new PermanentBackendException(tc);
         }
 
         return future;
     }
 
-    private ReadTransaction getReadTransaction() {
+    private synchronized ReadTransaction getReadTransaction() throws TransactionClosed {
+        if (tx == null) {
+            throw new TransactionClosed("Transaction closed during execution");
+        }
+
         return isolationLevel == IsolationLevel.SERIALIZABLE ? tx : tx.snapshot();
     }
 }
