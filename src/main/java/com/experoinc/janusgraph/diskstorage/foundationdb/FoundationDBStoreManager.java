@@ -212,15 +212,6 @@ public class FoundationDBStoreManager
             }
 
             try {
-                // TODO this looks like a race condition
-                // Wait just a little bit before closing so that independent transaction threads can
-                // clean up.
-                Thread.sleep(30);
-            } catch (InterruptedException e) {
-                // Ignore
-            }
-
-            try {
                 db.close();
             } catch (Exception e) {
                 throw new PermanentBackendException("Could not close FoundationDB database", e);
@@ -239,7 +230,6 @@ public class FoundationDBStoreManager
 
     @Override
     public boolean exists() throws BackendException {
-        // @todo
         try {
             return DirectoryLayer.getDefault().exists(db, PathUtil.from(rootDirectoryName)).get();
         } catch (InterruptedException e) {
