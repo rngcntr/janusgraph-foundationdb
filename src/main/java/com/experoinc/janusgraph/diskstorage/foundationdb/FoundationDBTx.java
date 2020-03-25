@@ -6,6 +6,7 @@ import com.apple.foundationdb.Database;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -188,23 +189,27 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
         throws PermanentBackendException {
-        List<KeyValue> result = waitForFuture(readWithRetriesAsync(
-            readTx
-            -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit()).asList()));
+        List<KeyValue> result = waitForFuture(
+            readWithRetriesAsync(readTx
+                                 -> readTx
+                                        .getRange(query.getStartKeySelector(),
+                                                  query.getEndKeySelector(), query.getLimit())
+                                        .asList()));
         hasCompletedReadOperation = true;
         return result != null ? result : Collections.emptyList();
     }
 
     public synchronized Map<KVQuery, List<KeyValue>>
-    getMultiRange(final List<FoundationDBRangeQuery> queries) throws PermanentBackendException {
+    getMultiRange(final Collection<FoundationDBRangeQuery> queries) throws PermanentBackendException {
         Map<KVQuery, CompletableFuture<List<KeyValue>>> futureMap = new ConcurrentHashMap<>();
         for (FoundationDBRangeQuery query : queries) {
             futureMap.put(
                 query.asKVQuery(),
-                readWithRetriesAsync(
-                    readTx
-                    -> readTx.getRange(query.getStartKey(), query.getEndKey(), query.getLimit())
-                           .asList()));
+                readWithRetriesAsync(readTx
+                                     -> readTx
+                                            .getRange(query.getStartKeySelector(),
+                                                      query.getEndKeySelector(), query.getLimit())
+                                            .asList()));
         }
 
         Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();

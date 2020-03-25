@@ -1,58 +1,36 @@
 package com.experoinc.janusgraph.diskstorage;
 
 import com.apple.foundationdb.KeyValue;
-import com.apple.foundationdb.directory.DirectorySubspace;
+import com.apple.foundationdb.subspace.Subspace;
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBKeyValueStore;
 import java.util.Iterator;
 import java.util.List;
 import org.janusgraph.diskstorage.StaticBuffer;
-import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.KeySelector;
 import org.janusgraph.diskstorage.keycolumnvalue.keyvalue.KeyValueEntry;
 import org.janusgraph.diskstorage.util.RecordIterator;
 
 public class FoundationDBRecordIterator implements RecordIterator<KeyValueEntry> {
-    private final DirectorySubspace ds;
+    private final Subspace ds;
 
     private final Iterator<KeyValue> entries;
-    private final KeySelector selector;
-    private KeyValueEntry nextEntry;
 
-    public FoundationDBRecordIterator(final DirectorySubspace ds, final List<KeyValue> result, KeySelector selector) {
+    public FoundationDBRecordIterator(Subspace ds, final List<KeyValue> result) {
         this.ds = ds;
         this.entries = result.iterator();
-        this.selector = selector;
-        nextEntry = findNextEntry();
-    }
-
-    private KeyValueEntry findNextEntry() {
-        while (entries.hasNext()) {
-            KeyValue candidate;
-            StaticBuffer key;
-            do {
-                candidate = entries.next();
-                key =
-                    FoundationDBKeyValueStore.getBuffer(ds.unpack(candidate.getKey()).getBytes(0));
-            } while (!selector.include(key) && entries.hasNext());
-
-            if (selector.include(key)) {
-                return new KeyValueEntry(key,
-                                         FoundationDBKeyValueStore.getBuffer(candidate.getValue()));
-            }
-        }
-
-        return null;
     }
 
     @Override
     public boolean hasNext() {
-        return nextEntry != null;
+        return entries.hasNext();
     }
 
     @Override
     public KeyValueEntry next() {
-        KeyValueEntry returnValue = nextEntry;
-        nextEntry = findNextEntry();
-        return returnValue;
+        KeyValue nextKV = entries.next();
+        StaticBuffer key =
+            FoundationDBKeyValueStore.getBuffer(ds.unpack(nextKV.getKey()).getBytes(0));
+        StaticBuffer value = FoundationDBKeyValueStore.getBuffer(nextKV.getValue());
+        return new KeyValueEntry(key, value);
     }
 
     @Override

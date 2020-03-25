@@ -14,15 +14,17 @@
 
 package com.experoinc.janusgraph.diskstorage.foundationdb;
 
+import com.apple.foundationdb.KeySelector;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.experoinc.janusgraph.diskstorage.FoundationDBRecordIterator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.PermanentBackendException;
 import org.janusgraph.diskstorage.StaticBuffer;
@@ -108,14 +110,45 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         throws BackendException {
         log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         final FoundationDBTx tx = getTransaction(txh);
-        final List<KeyValueEntry> result = new ArrayList<>();
 
+        final List<KeyValue> completeResult = new ArrayList<>();
         final FoundationDBRangeQuery fdbQuery = new FoundationDBRangeQuery(db, query);
 
         try {
-            final List<KeyValue> results = tx.getRange(fdbQuery);
-            log.trace("db={}, op=getSlice, tx={}, resultcount={}", name, txh, result.size());
-            return new FoundationDBRecordIterator(db, results, query.getKeySelector());
+            // the query needs to be repeated if applying the KeySelector drops the result size
+            // below the query limit
+            while (completeResult.size() < query.getLimit()) {
+                final List<KeyValue> partialResult = tx.getRange(fdbQuery);
+                if (partialResult != null && partialResult.size() > 0) {
+                    int maximumCompleteResultSize = completeResult.size() + partialResult.size();
+                    KeyValue lastFoundKV = partialResult.get(partialResult.size() - 1);
+
+                    // only take KV pairs that match the KeySelector rules
+                    for (final KeyValue kv : partialResult) {
+                        StaticBuffer key = getBuffer(db.unpack(kv.getKey()).getBytes(0));
+                        if (query.getKeySelector().include(key)) {
+                            completeResult.add(kv);
+                        }
+                    }
+
+                    if (maximumCompleteResultSize < query.getLimit()) {
+                        // further searching will not yield any more results than already
+                        // accumulated
+                        break;
+                    }
+
+                    // start the next range at read the end of the current result
+                    fdbQuery.setStartKeySelector(
+                        KeySelector.firstGreaterThan(lastFoundKV.getKey()));
+                } else {
+                    // no more entries were found, so no reason to search any further
+                    break;
+                }
+            }
+
+            log.trace("db={}, op=getSlice, tx={}, resultcount={}", name, txh,
+                      completeResult.size());
+            return new FoundationDBRecordIterator(db, completeResult);
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
@@ -127,25 +160,66 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         throws BackendException {
         log.trace("beginning db={}, op=getSlice, tx={}", name, txh);
         FoundationDBTx tx = getTransaction(txh);
-        final Map<KVQuery, RecordIterator<KeyValueEntry>> resultMap = new ConcurrentHashMap<>();
+
+        final Map<KVQuery, List<KeyValue>> completeResultMap = new ConcurrentHashMap<>();
+        final Map<KVQuery, FoundationDBRangeQuery> fdbQueries = new ConcurrentHashMap<>();
+
+        for (KVQuery q : queries) {
+            completeResultMap.put(q, new ArrayList<>());
+            fdbQueries.put(q, new FoundationDBRangeQuery(db, q));
+        }
 
         try {
-            final List<FoundationDBRangeQuery> fdbQueries =
-                queries.stream()
-                    .map(q -> new FoundationDBRangeQuery(db, q))
-                    .collect(Collectors.toList());
-            final Map<KVQuery, List<KeyValue>> result = tx.getMultiRange(fdbQueries);
+            // fdbQueries contains all queries that are not finished yet with respect to their limit
+            while (fdbQueries.size() > 0) {
+                final Map<KVQuery, List<KeyValue>> partialResultMap =
+                    tx.getMultiRange(fdbQueries.values());
 
-            for (Map.Entry<KVQuery, List<KeyValue>> entry : result.entrySet()) {
-                resultMap.put(entry.getKey(),
-                              new FoundationDBRecordIterator(db, entry.getValue(),
-                                                             entry.getKey().getKeySelector()));
+                // for each query, check if it is complete after adding the newly obtained results
+                for (Entry<KVQuery, List<KeyValue>> currentPartialResultMap :
+                     partialResultMap.entrySet()) {
+                    KVQuery currentQuery = currentPartialResultMap.getKey();
+                    List<KeyValue> currentPartialResult = currentPartialResultMap.getValue();
+
+                    if (currentPartialResult != null && currentPartialResult.size() > 0) {
+                        int maximumCompleteResultSize = completeResultMap.get(currentQuery).size() +
+                                                        currentPartialResult.size();
+                        KeyValue lastFoundKV =
+                            currentPartialResult.get(currentPartialResult.size() - 1);
+
+                        // only take KV pairs that match the KeySelector rules
+                        for (final KeyValue kv : currentPartialResult) {
+                            StaticBuffer key = getBuffer(db.unpack(kv.getKey()).getBytes(0));
+                            if (currentQuery.getKeySelector().include(key)) {
+                                completeResultMap.get(currentQuery).add(kv);
+                            }
+                        }
+
+                        if (maximumCompleteResultSize < currentQuery.getLimit()) {
+                            // further searching will not yield any more results than already
+                            // accumulated
+                            fdbQueries.remove(currentQuery);
+                        } else {
+                            // start the next range at read the end of the current result
+                            fdbQueries.get(currentQuery)
+                                .setStartKeySelector(
+                                    KeySelector.firstGreaterThan(lastFoundKV.getKey()));
+                        }
+                    } else {
+                        // no more entries were found, so no reason to search any further
+                        fdbQueries.remove(currentQuery);
+                    }
+                }
             }
+
+            final Map<KVQuery, RecordIterator<KeyValueEntry>> iteratorMap = new HashMap<>();
+            for (Entry<KVQuery, List<KeyValue>> kv : completeResultMap.entrySet()) {
+                iteratorMap.put(kv.getKey(), new FoundationDBRecordIterator(db, kv.getValue()));
+            }
+            return iteratorMap;
         } catch (Exception e) {
             throw new PermanentBackendException(e);
         }
-
-        return resultMap;
     }
 
     @Override

@@ -59,4 +59,10 @@ public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
     public void storeAndRetrievePerformance() {
         // the original test fails because of the foundationdb limitations
     }
+
+    @Test
+    @Override
+    public void testGetSlices() throws Exception {
+        super.testGetSlices();
+    }
 }
