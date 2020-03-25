@@ -124,7 +124,7 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
         return store.containsKey(KeyValueStoreUtil.getBuffer(key), tx);
     }
 
-    public void doLongRunningRead(StoreTransaction tx) throws BackendException {
+    protected void doLongRunningRead(StoreTransaction tx) throws BackendException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
         while (System.currentTimeMillis() < startTime + 10000) {
@@ -133,7 +133,7 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
         }
     }
 
-    public void doLongRunningReadInsert(StoreTransaction tx) throws BackendException {
+    protected void doLongRunningReadInsert(StoreTransaction tx) throws BackendException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
         // TODO: Find out why 6000ms is not enough here to force a restart of the transaction
@@ -141,5 +141,19 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
             insert(counter, String.valueOf(1), tx);
             counter += Integer.parseInt(getFirstOfRange(0, counter + 1, tx));
         }
+    }
+
+    protected void doWritePauseWrite(StoreTransaction tx) throws Exception {
+        insert(0, "0", tx);
+        Thread.sleep(10_000);
+        insert(1, "1", tx);
+    }
+
+    protected void doWriteReadPauseWrite(StoreTransaction tx) throws Exception {
+        insert(0, "0", tx);
+        if(!contains(1, tx)) {
+            Thread.sleep(10_000);
+        }
+        insert(1, "1", tx);
     }
 }

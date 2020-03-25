@@ -12,11 +12,14 @@
 
 package com.experoinc.janusgraph.diskstorage.foundationdb.isolation;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBStoreManager;
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx;
+import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTxException;
+
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.keycolumnvalue.StoreTransaction;
 import org.junit.jupiter.api.Test;
@@ -39,20 +42,41 @@ public class FoundationDBSerializableTest extends FoundationDBIsolationTest {
     }
 
     @Test
-    public void longReadFailWithNoRetriesAllowed() throws BackendException {
+    public void longReadFailWithTimeout() throws BackendException {
         StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        assertThrows(BackendException.class, () -> {
+        FoundationDBTxException fdbtex = assertThrows(FoundationDBTxException.class, () -> {
             doLongRunningRead(tx);
             tx.commit();
-        }, "Transaction can not be retried because of earlier successful read");
+        });
+        assertEquals(FoundationDBTxException.TIMEOUT, fdbtex.getMessage());
     }
 
     @Test
-    public void longReadWriteFailWithMaxRetries() throws BackendException {
+    public void longReadWriteFailWithTimeout() throws BackendException {
         StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        assertThrows(BackendException.class, () -> {
+        FoundationDBTxException fdbtex = assertThrows(FoundationDBTxException.class, () -> {
             doLongRunningReadInsert(tx);
             tx.commit();
-        }, "Max transaction reset count exceeded");
+        });
+        assertEquals(FoundationDBTxException.TIMEOUT, fdbtex.getMessage());
+    }
+
+    @Test
+    public void writePauseWriteSucceedWithRetry() throws BackendException {
+        StoreTransaction tx = manager.beginTransaction(getTxConfig());
+        assertDoesNotThrow(() -> {
+            doWritePauseWrite(tx);
+            tx.commit();
+        });
+    }
+
+    @Test
+    public void writeReadPauseWriteFailWithTimeout() throws BackendException {
+        StoreTransaction tx = manager.beginTransaction(getTxConfig());
+        FoundationDBTxException fdbtex = assertThrows(FoundationDBTxException.class, () -> {
+            doWriteReadPauseWrite(tx);
+            tx.commit();
+        });
+        assertEquals(FoundationDBTxException.TIMEOUT, fdbtex.getMessage());
     }
 }

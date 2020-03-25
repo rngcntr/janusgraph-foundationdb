@@ -3,6 +3,7 @@ package com.experoinc.janusgraph.diskstorage.foundationdb;
 import static java.util.AbstractMap.SimpleEntry;
 
 import com.apple.foundationdb.Database;
+import com.apple.foundationdb.FDBException;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
@@ -65,7 +66,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         }
     }
 
-    public synchronized void restart() throws PermanentBackendException {
+    public synchronized void restart() throws FoundationDBTxException {
         txCtr.incrementAndGet();
         if (tx == null) {
             return;
@@ -81,8 +82,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
         if (isolationLevel == IsolationLevel.SERIALIZABLE && hasCompletedReadOperation) {
             // only retry this transaction if it has not exposed any data yet
-            throw new PermanentBackendException(
-                "Transaction can not be retried because of earlier successful read");
+            throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT);
         }
 
         tx = db.createTransaction();
@@ -119,7 +119,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             tx.close();
             tx = null;
         } catch (Exception e) {
-            throw new PermanentBackendException(e);
+            throw new FoundationDBTxException(e);
         } finally {
             if (tx != null) {
                 tx.close();
@@ -156,12 +156,12 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             } catch (IllegalStateException | ExecutionException e) {
                 restart();
             } catch (Exception e) {
-                throw new PermanentBackendException(e);
+                throw new FoundationDBTxException(e);
             }
         }
 
         if (failing) {
-            throw new PermanentBackendException("Max transaction reset count exceeded");
+            throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT);
         }
     }
 
@@ -183,7 +183,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
-        throws PermanentBackendException {
+        throws FoundationDBTxException {
         List<KeyValue> result = waitForFuture(
             readWithRetriesAsync(readTx
                                  -> readTx
@@ -195,7 +195,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     }
 
     public synchronized Map<KVQuery, List<KeyValue>>
-    getMultiRange(final Collection<FoundationDBRangeQuery> queries) throws PermanentBackendException {
+    getMultiRange(final Collection<FoundationDBRangeQuery> queries) throws FoundationDBTxException {
         Map<KVQuery, CompletableFuture<List<KeyValue>>> futureMap = new ConcurrentHashMap<>();
         for (FoundationDBRangeQuery query : queries) {
             futureMap.put(
@@ -230,52 +230,58 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         public CompletableFuture<T> read(ReadTransaction readTx);
     }
 
-    private <T> T waitForFuture(CompletableFuture<T> future) throws PermanentBackendException {
+    private <T> T waitForFuture(CompletableFuture<T> future) throws FoundationDBTxException {
         try {
-            return future.get();
-        } catch (ExecutionException eex) {
-            eex.printStackTrace();
-            throw new PermanentBackendException("Max transaction reset count exceeded");
-        } catch (InterruptedException e) {
-            throw new PermanentBackendException(
-                "Interrupted while waiting for FoundationDB result");
+            return future.join();
+        } catch (CompletionException cex) {
+            try {
+                throw cex.getCause();
+            } catch (FDBException fdbex) {
+                throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT, fdbex);
+            } catch (ExecutionException eex) {
+                if (eex.getCause() instanceof FoundationDBTxException) {
+                    throw (FoundationDBTxException) eex.getCause();
+                } else {
+                    throw new FoundationDBTxException(eex);
+                }
+            } catch (InterruptedException e) {
+                throw new FoundationDBTxException(FoundationDBTxException.INTERRUPTED);
+            } catch (Throwable impossible) {
+                throw new AssertionError(impossible);
+            }
         }
     }
 
     private <T> CompletableFuture<T> readWithRetriesAsync(RetriableOperation<T> operation)
-        throws PermanentBackendException {
+        throws FoundationDBTxException {
         int[] startTxId = {txCtr.get()};
         CompletableFuture<T> future;
 
-        try {
-            future = operation.read(getReadTransaction());
-            for (int i = 1; i < maxRuns; ++i) {
-                future = future.exceptionally(th -> {
-                    if (txCtr.get() == startTxId[0]) {
-                        try {
-                            this.restart();
-                        } catch (PermanentBackendException pbex) {
-                            throw new CompletionException(pbex);
-                        }
-                    }
-                    startTxId[0] = txCtr.get();
+        future = operation.read(getReadTransaction());
+        for (int i = 1; i < maxRuns; ++i) {
+            future = future.exceptionally(th -> {
+                if (txCtr.get() == startTxId[0]) {
                     try {
-                        return operation.read(getReadTransaction()).join();
-                    } catch (TransactionClosed tc) {
-                        throw new CompletionException(tc);
+                        this.restart();
+                    } catch (FoundationDBTxException fdbtex) {
+                        throw new CompletionException(fdbtex);
                     }
-                });
-            }
-        } catch (TransactionClosed tc) {
-            throw new PermanentBackendException(tc);
+                }
+                startTxId[0] = txCtr.get();
+                try {
+                    return operation.read(getReadTransaction()).join();
+                } catch (FoundationDBTxException fdbtex) {
+                    throw new CompletionException(fdbtex);
+                }
+            });
         }
 
         return future;
     }
 
-    private synchronized ReadTransaction getReadTransaction() throws TransactionClosed {
+    private synchronized ReadTransaction getReadTransaction() throws FoundationDBTxException {
         if (tx == null) {
-            throw new TransactionClosed("Transaction closed during execution");
+            throw new FoundationDBTxException(FoundationDBTxException.CLOSED_WHILE_ACTIVE);
         }
 
         return isolationLevel == IsolationLevel.SERIALIZABLE ? tx : tx.snapshot();
