@@ -154,11 +154,6 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                 failing = false;
                 break;
             } catch (IllegalStateException | ExecutionException e) {
-                e.printStackTrace();
-                if (isolationLevel.equals(IsolationLevel.SERIALIZABLE) ||
-                    isolationLevel.equals(IsolationLevel.READ_COMMITTED_NO_WRITE)) {
-                    break;
-                }
                 restart();
             } catch (Exception e) {
                 throw new PermanentBackendException(e);
