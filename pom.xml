@@ -6,7 +6,7 @@
 
     <groupId>com.experoinc.janusgraph</groupId>
     <artifactId>janusgraph-foundationdb</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
     <name>JanusGraph FoundationDB Storage Adapter</name>
 
@@ -17,6 +17,8 @@
         <foundationdb.version>6.2.10</foundationdb.version>
         <dependency.plugin.version>2.10</dependency.plugin.version>
         <testcontainers.version>1.13.0</testcontainers.version>
+        <maven.surefire.plugin.version>2.22.0</maven.surefire.plugin.version>
+        <maven.assembly.plugin.version>2.5.3</maven.assembly.plugin.version>
         <slf4j.version>1.7.25</slf4j.version>
         <test.skip.default>false</test.skip.default>
         <test.skip.tp>true</test.skip.tp>
@@ -122,7 +124,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.0</version>
+                <version>${maven.surefire.plugin.version}</version>
                 <configuration>
                     <parallel>none</parallel>
                     <runOrder>alphabetical</runOrder>
@@ -178,7 +180,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.5.3</version>
+                <version>${maven.assembly.plugin.version}</version>
                 <configuration>
                     <descriptor>src/assembly/dep.xml</descriptor>
                 </configuration>
