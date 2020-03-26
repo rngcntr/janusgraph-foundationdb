@@ -72,7 +72,8 @@ public class FoundationDBStoreManager
 
         fdb = FDB.selectAPIVersion(configuration.get(VERSION));
         rootDirectoryName = determineRootDirectoryName(configuration);
-        db = "default".equals(configuration.get(CLUSTER_FILE_PATH))
+        db = FoundationDBConfigOptions.CLUSTER_FILE_PATH.getDefaultValue().equals(
+                 configuration.get(CLUSTER_FILE_PATH))
                  ? fdb.open()
                  : fdb.open(configuration.get(CLUSTER_FILE_PATH));
 

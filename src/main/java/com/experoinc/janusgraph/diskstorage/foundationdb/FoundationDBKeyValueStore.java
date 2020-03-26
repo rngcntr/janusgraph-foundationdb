@@ -17,7 +17,6 @@ package com.experoinc.janusgraph.diskstorage.foundationdb;
 import com.apple.foundationdb.KeySelector;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.directory.DirectorySubspace;
-import com.experoinc.janusgraph.diskstorage.FoundationDBRecordIterator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;

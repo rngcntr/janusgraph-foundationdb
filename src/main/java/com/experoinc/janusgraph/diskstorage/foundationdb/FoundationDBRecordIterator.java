@@ -1,8 +1,7 @@
-package com.experoinc.janusgraph.diskstorage;
+package com.experoinc.janusgraph.diskstorage.foundationdb;
 
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.subspace.Subspace;
-import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBKeyValueStore;
 import java.util.Iterator;
 import java.util.List;
 import org.janusgraph.diskstorage.StaticBuffer;

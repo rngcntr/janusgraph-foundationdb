@@ -25,8 +25,8 @@ public class FoundationDBRangeQuery {
         originalQuery = kvQuery;
         limit = kvQuery.getLimit();
 
-        byte[] startKey = db.pack(kvQuery.getStart().as(FoundationDBRangeQuery.ENTRY_FACTORY));
-        byte[] endKey = db.pack(kvQuery.getEnd().as(FoundationDBRangeQuery.ENTRY_FACTORY));
+        byte[] startKey = db.pack(kvQuery.getStart().as(ENTRY_FACTORY));
+        byte[] endKey = db.pack(kvQuery.getEnd().as(ENTRY_FACTORY));
 
         startKeySelector = KeySelector.firstGreaterOrEqual(startKey);
         endKeySelector = KeySelector.firstGreaterOrEqual(endKey);

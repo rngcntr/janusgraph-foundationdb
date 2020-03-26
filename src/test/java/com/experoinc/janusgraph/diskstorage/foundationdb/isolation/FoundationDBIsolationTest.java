@@ -136,11 +136,17 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
     protected void doLongRunningReadInsert(StoreTransaction tx) throws BackendException {
         long startTime = System.currentTimeMillis();
         int counter = 0;
-        // TODO: Find out why 6000ms is not enough here to force a restart of the transaction
         while (System.currentTimeMillis() < startTime + 10_000) {
             insert(counter, String.valueOf(1), tx);
             counter += Integer.parseInt(getFirstOfRange(0, counter + 1, tx));
         }
+    }
+
+    protected void doReadPauseRead(StoreTransaction tx) throws Exception {
+        if(!contains(0, tx)) {
+            Thread.sleep(10_000);
+        }
+        contains(0, tx);
     }
 
     protected void doWritePauseWrite(StoreTransaction tx) throws Exception {

@@ -58,4 +58,22 @@ public class FoundationDBReadCommittedWithWriteTest extends FoundationDBIsolatio
             tx.commit();
         });
     }
+
+    @Test
+    public void writePauseWriteSucceedWithRetry() throws BackendException {
+        StoreTransaction tx = manager.beginTransaction(getTxConfig());
+        assertDoesNotThrow(() -> {
+            doWritePauseWrite(tx);
+            tx.commit();
+        });
+    }
+
+    @Test
+    public void writeReadPauseWriteSucceedWithoutException() throws BackendException {
+        StoreTransaction tx = manager.beginTransaction(getTxConfig());
+        assertDoesNotThrow(() -> {
+            doWriteReadPauseWrite(tx);
+            tx.commit();
+        });
+    }
 }
