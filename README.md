@@ -59,3 +59,6 @@ Follow these steps if you'd like to use the latest version built from source.
 
 ## Isolation Levels
 FoundationDB provides serializable isolation under a specific set of [constraints](https://apple.github.io/foundationdb/known-limitations.html#current-limitations). Namely transactions will fail if they take longer than 5 seconds or read/write more than 10,000,000 bytes. This adapter allows the user to relax the how JanusGraph uses FoundationDB transactions and to spread a single JanusGraph transaction over more than one FoundationDB transaction. `read_committed_no_write` allows reads to be spread across more than one transasction, but will fail any writes that are attempted outside of the first transaction period. `read_committed_with_write` allows reads and writes to extend over more than one single transaction. If this option is selected, invariants may be broken and the system will behave similarily to an eventually consistent system.
+
+### Caution:
+`read_committed_with_write` is not implemented yet.
