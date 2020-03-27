@@ -13,7 +13,7 @@
     <properties>
         <maven.compiler.plugin.version>3.6.2</maven.compiler.plugin.version>
         <jdk.version>1.8</jdk.version>
-        <janusgraph.version>0.4.0</janusgraph.version>
+        <janusgraph.version>0.4.1</janusgraph.version>
         <foundationdb.version>6.2.10</foundationdb.version>
         <dependency.plugin.version>2.10</dependency.plugin.version>
         <testcontainers.version>1.13.0</testcontainers.version>

@@ -29,7 +29,6 @@ import org.janusgraph.diskstorage.configuration.ConfigOption;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,59 +136,4 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     public void testVertexCentricQuery() {
         testVertexCentricQuery(100 /*noVertices*/);
     }
-
-    @Test
-    @Disabled
-    @Override
-    public void testSettingTTLOnNonStaticVertexLabel() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testSettingTTLOnUnsupportedType() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testEdgeTTLImplicitKey() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testEdgeTTLLimitedByVertexTTL() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testEdgeTTLTiming() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testEdgeTTLWithIndex() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testEdgeTTLWithTransactions() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testPropertyTTLTiming() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testUnsettingTTL() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testVertexTTLImplicitKey() {}
-
-    @Test
-    @Disabled
-    @Override
-    public void testVertexTTLWithCompositeIndex() {}
 }
