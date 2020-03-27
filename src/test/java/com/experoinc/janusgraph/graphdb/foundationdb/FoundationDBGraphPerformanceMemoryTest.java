@@ -15,6 +15,7 @@
 package com.experoinc.janusgraph.graphdb.foundationdb;
 
 import com.experoinc.janusgraph.FoundationDBContainer;
+import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphPerformanceMemoryTest;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,6 +32,7 @@ public class FoundationDBGraphPerformanceMemoryTest extends JanusGraphPerformanc
 
     @Override
     public WriteConfiguration getConfiguration() {
-        return fdbContainer.getFoundationDBGraphConfiguration();
+        ModifiableConfiguration modifiableConfiguration = fdbContainer.getFoundationDBConfiguration();
+        return modifiableConfiguration.getConfiguration();
     }
 }

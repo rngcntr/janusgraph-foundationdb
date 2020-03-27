@@ -15,8 +15,11 @@
 package com.experoinc.janusgraph.graphdb.foundationdb;
 
 import com.experoinc.janusgraph.FoundationDBContainer;
+import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphPartitionGraphTest;
+import org.janusgraph.graphdb.configuration.GraphDatabaseConfiguration;
+import org.janusgraph.graphdb.database.idassigner.placement.SimpleBulkPlacementStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -26,11 +29,26 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 public class FoundationDBPartitionGraphTest extends JanusGraphPartitionGraphTest {
 
-    @Container
-    public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
+    final static int numPartitions = 8;
+
+    @Container public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
     @Override
     public WriteConfiguration getBaseConfiguration() {
         return fdbContainer.getFoundationDBGraphConfiguration();
+    }
+
+    @Override
+    public WriteConfiguration getConfiguration() {
+        ModifiableConfiguration modifiableConfiguration =
+            fdbContainer.getFoundationDBConfiguration();
+        // Let GraphDatabaseConfiguration's config freezer set CLUSTER_PARTITION
+        // modifiableConfiguration.set(GraphDatabaseConfiguration.CLUSTER_PARTITION,true);
+        modifiableConfiguration.set(GraphDatabaseConfiguration.CLUSTER_MAX_PARTITIONS,
+                                    numPartitions);
+        // uses SimpleBulkPlacementStrategy by default
+        modifiableConfiguration.set(SimpleBulkPlacementStrategy.CONCURRENT_PARTITIONS,
+                                    3 * numPartitions);
+        return modifiableConfiguration.getConfiguration();
     }
 }

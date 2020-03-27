@@ -15,6 +15,7 @@
 package com.experoinc.janusgraph.graphdb.database.management;
 
 import com.experoinc.janusgraph.FoundationDBContainer;
+import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.database.management.ManagementTest;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,6 +32,7 @@ public class FoundationDBManagementTest extends ManagementTest {
 
     @Override
     public WriteConfiguration getConfiguration() {
-        return fdbContainer.getFoundationDBGraphConfiguration();
+        ModifiableConfiguration modifiableConfiguration = fdbContainer.getFoundationDBConfiguration();
+        return modifiableConfiguration.getConfiguration();
     }
 }
