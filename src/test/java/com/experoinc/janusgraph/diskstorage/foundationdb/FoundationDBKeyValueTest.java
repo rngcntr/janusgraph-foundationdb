@@ -41,7 +41,7 @@ public class FoundationDBKeyValueTest extends KeyValueStoreTest {
 
     @Test
     public void readYourWritesTest() throws BackendException {
-        store.insert(KeyValueStoreUtil.getBuffer(0), KeyValueStoreUtil.getBuffer("test"), tx);
+        store.insert(KeyValueStoreUtil.getBuffer(0), KeyValueStoreUtil.getBuffer("test"), tx, null);
         StaticBuffer output = store.get(KeyValueStoreUtil.getBuffer(0), tx);
         assertEquals(0, KeyValueStoreUtil.getBuffer("test").compareTo(output));
     }

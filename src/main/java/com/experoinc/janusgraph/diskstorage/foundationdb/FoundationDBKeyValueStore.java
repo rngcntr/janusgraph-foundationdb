@@ -168,7 +168,7 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
     }
 
     @Override
-    public void insert(StaticBuffer key, StaticBuffer value, StoreTransaction txh)
+    public void insert(StaticBuffer key, StaticBuffer value, StoreTransaction txh, Integer ttl)
         throws BackendException {
         FoundationDBTx tx = getTransaction(txh);
         log.trace("db={}, op=insert, tx={}", name, txh);

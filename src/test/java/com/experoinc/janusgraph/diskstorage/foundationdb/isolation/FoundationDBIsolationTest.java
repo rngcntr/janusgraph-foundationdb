@@ -103,7 +103,7 @@ public abstract class FoundationDBIsolationTest extends AbstractKCVSTest {
     }
 
     protected void insert(int key, String value, StoreTransaction tx) throws BackendException {
-        store.insert(KeyValueStoreUtil.getBuffer(key), KeyValueStoreUtil.getBuffer(value), tx);
+        store.insert(KeyValueStoreUtil.getBuffer(key), KeyValueStoreUtil.getBuffer(value), tx, null);
     }
 
     protected String get(int key, StoreTransaction tx) throws BackendException {
