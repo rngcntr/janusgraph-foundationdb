@@ -31,11 +31,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
 
-    @Container
-    public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
+    @Container public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
     public KeyColumnValueStoreManager openStorageManager() throws BackendException {
-        FoundationDBStoreManager sm = new FoundationDBStoreManager(fdbContainer.getFoundationDBConfiguration());
+        FoundationDBStoreManager sm =
+            new FoundationDBStoreManager(fdbContainer.getFoundationDBConfiguration());
         return new OrderedKeyValueStoreManagerAdapter(sm, ImmutableMap.of(storeName, 8));
     }
 
@@ -43,20 +43,13 @@ public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
     @Disabled
     @Override
     public void testConcurrentGetSlice() {
-        // one thread fails (probably with timeout), which causes the other threads to time out
+
     }
 
     @Test
     @Disabled
     @Override
     public void testConcurrentGetSliceAndMutate() {
-        // one thread fails (probably with timeout), which causes the other threads to time out
-    }
-    
-    @Test
-    @Disabled
-    @Override
-    public void storeAndRetrievePerformance() {
-        // the original test fails because of the foundationdb limitations
+
     }
 }

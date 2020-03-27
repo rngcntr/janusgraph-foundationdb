@@ -111,6 +111,9 @@ public class FoundationDBKeyValueStore implements OrderedKeyValueStore {
         // the query needs to be repeated if applying the KeySelector drops the result size
         // below the query limit
         while (completeResult.size() < query.getLimit()) {
+            if (query.getLimit() == 42) {
+                System.out.println("42");
+            }
             final List<KeyValue> partialResult = tx.getRange(fdbQuery);
             if (partialResult != null && partialResult.size() > 0) {
                 int maximumCompleteResultSize = completeResult.size() + partialResult.size();

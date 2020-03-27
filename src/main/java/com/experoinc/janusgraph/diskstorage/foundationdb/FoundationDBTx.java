@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.BaseTransactionConfig;
 import org.janusgraph.diskstorage.common.AbstractStoreTransaction;
@@ -48,6 +47,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private final IsolationLevel isolationLevel;
 
     private AtomicInteger txCtr = new AtomicInteger(0);
+
     private boolean hasCompletedReadOperation = false;
 
     public FoundationDBTx(Database db, Transaction t, BaseTransactionConfig config,
@@ -65,7 +65,6 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         case READ_COMMITTED_WITH_WRITE:
             this.maxRuns = maxRuns;
         }
-
     }
 
     public synchronized void restart() throws FoundationDBTxException {
@@ -91,17 +90,13 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         /*
          * Reapply mutations but do not clear them out just in case this transaction also
          * times out and they need to be reapplied.
-         * 
+         *
          * @todo Note that at this point, the large transaction case (tx exceeds 10,000,000 bytes)
          * is not handled.
          */
-        inserts.forEach(insert -> {
-            tx.set(insert.getKey(), insert.getValue());
-        });
+        inserts.forEach(insert -> { tx.set(insert.getKey(), insert.getValue()); });
 
-        deletions.forEach(delete -> {
-            tx.clear(delete);
-        });
+        deletions.forEach(delete -> { tx.clear(delete); });
     }
 
     @Override
@@ -179,7 +174,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     /**
      * Fetches the value for a given key from the KV store.
-     * 
+     *
      * @param key The key at which the requested value is located.
      * @return The value for the given key.
      * @throws FoundationDBTxException If the read operation can not be completed.
@@ -195,7 +190,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     /**
      * Fetches the values for a given key range from the KV store.
-     * 
+     *
      * @param query The range query.
      * @return The values for the given key range.
      * @throws FoundationDBTxException If the read operation can not be completed.
@@ -216,7 +211,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     /**
      * Fetches the values for multiple key ranges from the KV store.
-     * 
+     *
      * @param query The range queries.
      * @return The values for the given key ranges.
      * @throws FoundationDBTxException If the read operation can not be completed.
@@ -245,7 +240,6 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         }
     }
 
-
     /**
      * Inserts a KV pair into the KV store. The change will take effect on commit time.
      *
@@ -271,7 +265,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     /**
      * Blocks until the future is completed either exceptionally or with a valid result.
-     * 
+     *
      * @param <T> The return type of the future.
      * @param future The future to wait for.
      * @return The future's result if completion was successful.
@@ -287,12 +281,12 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                 throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT, fdbex);
             } catch (ExecutionException eex) {
                 if (eex.getCause() instanceof FoundationDBTxException) {
-                    throw (FoundationDBTxException) eex.getCause();
+                    throw(FoundationDBTxException) eex.getCause();
                 } else {
                     throw new FoundationDBTxException(eex);
                 }
             } catch (InterruptedException | IllegalStateException e) {
-                throw new FoundationDBTxException(FoundationDBTxException.INTERRUPTED);
+                throw new FoundationDBTxException(FoundationDBTxException.INTERRUPTED, e);
             } catch (Throwable impossible) {
                 throw new AssertionError(impossible);
             }
@@ -302,10 +296,11 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     /**
      * Performs a read access on the KV store. If it fails, the read is retried up to maxRuns times.
      * If the last repetition fails, the returned future will complete exceptionally.
-     * 
+     *
      * @param <T> The return type of the future.
      * @param operation The read to perform, as a function of a transaction.
      * @return The future that will eventually contain the result of the read.
+     * @throws InterruptedException
      */
     private <T> CompletableFuture<T> readWithRetriesAsync(
         Function<? super ReadTransaction, ? extends CompletableFuture<T>> operation)
@@ -352,7 +347,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
     /**
      * Grants safe access to the underlying transaction.
-     * 
+     *
      * @return The FoundationDB transaction, if not null.
      * @throws FoundationDBTxException If the FoundationDB transaction is null.
      */

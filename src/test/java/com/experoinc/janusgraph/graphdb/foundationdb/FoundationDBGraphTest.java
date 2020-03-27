@@ -14,17 +14,22 @@
 
 package com.experoinc.janusgraph.graphdb.foundationdb;
 
+import static org.janusgraph.testutil.JanusGraphAssert.assertCount;
 import static org.junit.Assert.*;
 
 import com.experoinc.janusgraph.FoundationDBContainer;
+import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptions;
+import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx.IsolationLevel;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.janusgraph.core.JanusGraphException;
 import org.janusgraph.core.JanusGraphFactory;
 import org.janusgraph.diskstorage.BackendException;
+import org.janusgraph.diskstorage.configuration.ConfigOption;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphTest;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +45,6 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     @Container
     public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
-    @SuppressWarnings("unused")
     private static final Logger log =
             LoggerFactory.getLogger(FoundationDBGraphTest.class);
 
@@ -48,16 +52,16 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     public WriteConfiguration getConfiguration() {
         ModifiableConfiguration modifiableConfiguration = fdbContainer.getFoundationDBConfiguration();
         String methodName = this.testInfo.getDisplayName();
-        if (methodName.equals("testConsistencyEnforcement")) {
-//            IsolationLevel iso = IsolationLevel.SERIALIZABLE;
-//            log.debug("Forcing isolation level {} for test method {}", iso, methodName);
-//            modifiableConfiguration.set(FoundationDBStoreManager.ISOLATION_LEVEL, iso.toString());
+        if (methodName.equals("testConsistencyEnforcement()") || methodName.equals("testConcurrentConsistencyEnforcement()")) {
+            IsolationLevel iso = IsolationLevel.SERIALIZABLE;
+            log.debug("Forcing isolation level {} for test method {}", iso, methodName);
+            modifiableConfiguration.set(FoundationDBConfigOptions.ISOLATION_LEVEL, iso.toString());
         } else {
-//            IsolationLevel iso = null;
-//            if (modifiableConfiguration.has(FoundationDBStoreManager.ISOLATION_LEVEL)) {
-//                iso = ConfigOption.getEnumValue(modifiableConfiguration.get(FoundationDBStoreManager.ISOLATION_LEVEL),IsolationLevel.class);
-//            }
-//            log.debug("Using isolation level {} (null means adapter default) for test method {}", iso, methodName);
+            IsolationLevel iso = null;
+            if (modifiableConfiguration.has(FoundationDBConfigOptions.ISOLATION_LEVEL)) {
+                iso = ConfigOption.getEnumValue(modifiableConfiguration.get(FoundationDBConfigOptions.ISOLATION_LEVEL),IsolationLevel.class);
+            }
+            log.debug("Using isolation level {} (null means adapter default) for test method {}", iso, methodName);
         }
         return modifiableConfiguration.getConfiguration();
     }
@@ -65,8 +69,21 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     @Test
     @Override
     public void testConsistencyEnforcement() {
-        // Isolation must be set to serializable for this to work properly
+        // this test's isolation level is set to SERIALIZABLE in getConfiguration
         super.testConsistencyEnforcement();
+    }
+
+    @Test
+    @Override
+    public void testConcurrentConsistencyEnforcement() throws Exception {
+        // this test's isolation level is set to SERIALIZABLE in getConfiguration
+        super.testConcurrentConsistencyEnforcement();
+    }
+
+    @Test
+    @Override
+    public void testTinkerPopOptimizationStrategies() {
+        super.testTinkerPopOptimizationStrategies();
     }
 
     @Test
@@ -95,7 +112,84 @@ public class FoundationDBGraphTest extends JanusGraphTest {
 
     @Test
     @Override
+    public void testLargeJointIndexRetrieval() {
+        makeVertexIndexedKey("sid", Integer.class);
+        makeVertexIndexedKey("color", String.class);
+        finishSchema();
+
+        int sids = 17;
+        String[] colors = {"blue", "red", "yellow", "brown", "green", "orange", "purple"};
+        int multiplier = 20; // reduce multiplier to not exceed transaction limit
+        int numV = sids * colors.length * multiplier;
+        for (int i = 0; i < numV; i++) {
+            graph.addVertex("color", colors[i % colors.length], "sid", i % sids);
+        }
+        clopen();
+
+        assertCount(numV / sids, graph.query().has("sid", 8).vertices());
+        assertCount(numV / colors.length, graph.query().has("color", colors[2]).vertices());
+
+        assertCount(multiplier, graph.query().has("sid", 11).has("color", colors[3]).vertices());
+    }
+
+    @Test
+    @Override
     public void testVertexCentricQuery() {
         testVertexCentricQuery(100 /*noVertices*/);
     }
+
+    @Test
+    @Disabled
+    @Override
+    public void testSettingTTLOnNonStaticVertexLabel() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testSettingTTLOnUnsupportedType() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testEdgeTTLImplicitKey() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testEdgeTTLLimitedByVertexTTL() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testEdgeTTLTiming() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testEdgeTTLWithIndex() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testEdgeTTLWithTransactions() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testPropertyTTLTiming() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testUnsettingTTL() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testVertexTTLImplicitKey() {}
+
+    @Test
+    @Disabled
+    @Override
+    public void testVertexTTLWithCompositeIndex() {}
 }

@@ -42,20 +42,13 @@ public class FoundationDBVariableLengthKCVSTest extends KeyColumnValueStoreTest 
     @Disabled
     @Override
     public void testConcurrentGetSlice() {
-        // one thread fails (probably with timeout), which causes the other threads to time out
+
     }
 
     @Test
     @Disabled
     @Override
     public void testConcurrentGetSliceAndMutate() {
-        // one thread fails (probably with timeout), which causes the other threads to time out
-    }
-    
-    @Test
-    @Disabled
-    @Override
-    public void storeAndRetrievePerformance() {
-        // the original test fails because of the foundationdb limitations
+
     }
 }
