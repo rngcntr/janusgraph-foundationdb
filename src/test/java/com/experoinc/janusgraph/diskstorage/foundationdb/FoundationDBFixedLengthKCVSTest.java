@@ -43,13 +43,11 @@ public class FoundationDBFixedLengthKCVSTest extends KeyColumnValueStoreTest {
     @Disabled
     @Override
     public void testConcurrentGetSlice() {
-
     }
 
     @Test
     @Disabled
     @Override
     public void testConcurrentGetSliceAndMutate() {
-
     }
 }

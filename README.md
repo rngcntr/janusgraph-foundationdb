@@ -60,14 +60,14 @@ Follow these steps if you'd like to use the latest version built from source.
 ## Isolation Levels
 FoundationDB provides serializable isolation under a specific set of [constraints](https://apple.github.io/foundationdb/known-limitations.html#current-limitations). Namely transactions will fail if they take longer than 5 seconds or read/write more than 10,000,000 bytes. This adapter allows the user to relax the how JanusGraph uses FoundationDB transactions and to spread a single JanusGraph transaction over more than one FoundationDB transaction. `read_committed_no_write` allows reads to be spread across more than one transasction, but will fail any writes that are attempted outside of the first transaction period. `read_committed_with_write` allows reads and writes to extend over more than one single transaction. If this option is selected, invariants may be broken and the system will behave similarily to an eventually consistent system.
 
-* **`SERIALIZABLE`** (current state: implemented)
+* **`SERIALIZABLE`** (current state: implemented, used for some tests)
 
     This isolation level aims to provide strict serializability of transactions and thereby deliver FoundationDB's full ACID support to JanusGraph.
 
-* **`READ_COMMITTED_NO_WRITE`** (current state: partially implemented)
+* **`READ_COMMITTED_NO_WRITE`** (current state: implemented, used for most tests)
 
     This allows read accesses which happen within the scope of the same JanusGraph transaction to spread over multiple FoundationDB transactions. **This can cause inconsistencies within the read data**. In order to avoid inconsistent states of the stored data, all writes that are attempted outside the first transaction period will cause the JanusGrpah transaction to fail.
 
-* **`READ_COMMITTED_WITH_WRITE`** (current state: not implemented)
+* **`READ_COMMITTED_WITH_WRITE`** (current state: implemented)
 
     This allows both read and write accesses which happen within the scope of the same JanusGraph transaction to spread over multiple FoundationDB transactions. **This can cause an inconsistent state of the database**. It is not recommended to use this setting in multi threaded or multi user environments.

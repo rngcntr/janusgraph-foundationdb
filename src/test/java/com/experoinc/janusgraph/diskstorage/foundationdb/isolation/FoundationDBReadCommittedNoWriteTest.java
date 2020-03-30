@@ -14,9 +14,11 @@ package com.experoinc.janusgraph.diskstorage.foundationdb.isolation;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBStoreManager;
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx;
+import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTxException;
 import org.janusgraph.diskstorage.BackendException;
 import org.janusgraph.diskstorage.keycolumnvalue.StoreTransaction;
 import org.junit.jupiter.api.Test;
@@ -51,12 +53,13 @@ public class FoundationDBReadCommittedNoWriteTest extends FoundationDBIsolationT
     }
 
     @Test
-    public void longReadWriteSucceedWithoutException() throws BackendException {
-        assertDoesNotThrow(() -> {
+    public void longReadWriteFailWithTimeout() throws BackendException {
+        FoundationDBTxException fdbtex = assertThrows(FoundationDBTxException.class, () -> {
             StoreTransaction tx = manager.beginTransaction(getTxConfig());
             doLongRunningReadInsert(tx);
             tx.commit();
         });
+        assertEquals(FoundationDBTxException.TIMEOUT, fdbtex.getMessage());
     }
 
     @Test
@@ -69,11 +72,12 @@ public class FoundationDBReadCommittedNoWriteTest extends FoundationDBIsolationT
     }
 
     @Test
-    public void writeReadPauseWriteSucceedWithoutException() throws BackendException {
+    public void writeReadPauseWriteFailWithTimeout() throws BackendException {
         StoreTransaction tx = manager.beginTransaction(getTxConfig());
-        assertDoesNotThrow(() -> {
+        FoundationDBTxException fdbtex = assertThrows(FoundationDBTxException.class, () -> {
             doWriteReadPauseWrite(tx);
             tx.commit();
         });
+        assertEquals(FoundationDBTxException.TIMEOUT, fdbtex.getMessage());
     }
 }

@@ -22,6 +22,9 @@ import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptio
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx.IsolationLevel;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.janusgraph.core.JanusGraphException;
 import org.janusgraph.core.JanusGraphFactory;
 import org.janusgraph.diskstorage.BackendException;
@@ -47,11 +50,14 @@ public class FoundationDBGraphTest extends JanusGraphTest {
     private static final Logger log =
             LoggerFactory.getLogger(FoundationDBGraphTest.class);
 
+    private List<String> needSerializable = new ArrayList<>(
+        Arrays.asList("testConsistencyEnforcement()", "testConcurrentConsistencyEnforcement()"));
+
     @Override
     public WriteConfiguration getConfiguration() {
         ModifiableConfiguration modifiableConfiguration = fdbContainer.getFoundationDBConfiguration();
         String methodName = this.testInfo.getDisplayName();
-        if (methodName.equals("testConsistencyEnforcement()") || methodName.equals("testConcurrentConsistencyEnforcement()")) {
+        if (needSerializable.contains(methodName)) {
             IsolationLevel iso = IsolationLevel.SERIALIZABLE;
             log.debug("Forcing isolation level {} for test method {}", iso, methodName);
             modifiableConfiguration.set(FoundationDBConfigOptions.ISOLATION_LEVEL, iso.toString());
@@ -81,8 +87,16 @@ public class FoundationDBGraphTest extends JanusGraphTest {
 
     @Test
     @Override
-    public void testTinkerPopOptimizationStrategies() {
-        super.testTinkerPopOptimizationStrategies();
+    public void testIndexShouldRegisterWhenWeRemoveAnInstance() throws InterruptedException {
+        // TODO figure out why this test is failing
+        super.testIndexShouldRegisterWhenWeRemoveAnInstance();
+    }
+
+    @Test
+    @Override
+    public void testIndexUpdateSyncWithMultipleInstances() throws InterruptedException {
+        // TODO figure out why this test is failing
+        super.testIndexUpdateSyncWithMultipleInstances();
     }
 
     @Test
