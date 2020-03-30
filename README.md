@@ -18,14 +18,14 @@ JanusGraph, coupled with the FoundationDB storage adapter provides the following
 
 # Getting started
 
-The FoundationDB storage adapter requires a single FoundationDB instance or cluster and the FoundationDB client libraries. Downloads for server and client can be found [here](https://apple.github.io/foundationdb/downloads.html).
+The FoundationDB storage adapter requires a single FoundationDB instance or cluster and the FoundationDB client libraries. Downloads for server and client can be found [here](https://apple.github.io/foundationdb/downloads.html). Docker images are available [here](https://hub.docker.com/r/foundationdb/foundationdb).
 
 ## Setting up FoundationDB
 
 Mac install instructions can be found [here](https://apple.github.io/foundationdb/getting-started-mac.html) and Linux [here](https://apple.github.io/foundationdb/getting-started-linux.html).
 
 ## Installing the adapter from a binary release
-Binary releases can be found on [GitHub](http://github.com/experoinc/janusgraph-foundationdb/releases).
+Binary releases can be found on [GitHub](http://github.com/rngcntr/janusgraph-foundationdb/releases).
 
 This installation procedure will copy the necessary libraries, properties, and Gremlin Server configuration files into your JanusGraph installation.
 
@@ -60,5 +60,14 @@ Follow these steps if you'd like to use the latest version built from source.
 ## Isolation Levels
 FoundationDB provides serializable isolation under a specific set of [constraints](https://apple.github.io/foundationdb/known-limitations.html#current-limitations). Namely transactions will fail if they take longer than 5 seconds or read/write more than 10,000,000 bytes. This adapter allows the user to relax the how JanusGraph uses FoundationDB transactions and to spread a single JanusGraph transaction over more than one FoundationDB transaction. `read_committed_no_write` allows reads to be spread across more than one transasction, but will fail any writes that are attempted outside of the first transaction period. `read_committed_with_write` allows reads and writes to extend over more than one single transaction. If this option is selected, invariants may be broken and the system will behave similarily to an eventually consistent system.
 
-### Caution:
-`read_committed_with_write` is not implemented yet.
+* **`SERIALIZABLE`** (current state: implemented)
+
+    This isolation level aims to provide strict serializability of transactions and thereby deliver FoundationDB's full ACID support to JanusGraph.
+
+* **`READ_COMMITTED_NO_WRITE`** (current state: partially implemented)
+
+    This allows read accesses which happen within the scope of the same JanusGraph transaction to spread over multiple FoundationDB transactions. **This can cause inconsistencies within the read data**. In order to avoid inconsistent states of the stored data, all writes that are attempted outside the first transaction period will cause the JanusGrpah transaction to fail.
+
+* **`READ_COMMITTED_WITH_WRITE`** (current state: not implemented)
+
+    This allows both read and write accesses which happen within the scope of the same JanusGraph transaction to spread over multiple FoundationDB transactions. **This can cause an inconsistent state of the database**. It is not recommended to use this setting in multi threaded or multi user environments.
