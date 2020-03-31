@@ -17,6 +17,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.janusgraph.diskstorage.BackendException;
@@ -40,7 +42,8 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private List<SimpleEntry<byte[], byte[]>> inserts = new LinkedList<>();
     private List<byte[]> deletions = new LinkedList<>();
 
-    private long maxRuns = 1;
+    private final long COMMIT_TIMEOUT_SECONCS = 5;
+    private final long maxRuns;
 
     public enum IsolationLevel { SERIALIZABLE, READ_COMMITTED_NO_WRITE, READ_COMMITTED_WITH_WRITE }
 
@@ -56,47 +59,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         tx = t;
         this.db = db;
         this.isolationLevel = isolationLevel;
-
-        switch (isolationLevel) {
-        case SERIALIZABLE:
-            this.maxRuns = 1;
-            break;
-        case READ_COMMITTED_NO_WRITE:
-        case READ_COMMITTED_WITH_WRITE:
-            this.maxRuns = maxRuns;
-        }
-    }
-
-    public synchronized void restart() throws FoundationDBTxException {
-        txCtr.incrementAndGet();
-        if (tx == null) {
-            return;
-        }
-
-        try {
-            tx.cancel();
-        } catch (IllegalStateException ignored) {
-        } finally {
-            tx.close();
-        }
-
-        if (isolationLevel == IsolationLevel.SERIALIZABLE && hasCompletedReadOperation) {
-            // only retry this transaction if it has not exposed any data yet
-            throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT);
-        }
-
-        tx = db.createTransaction();
-
-        /*
-         * Reapply mutations but do not clear them out just in case this transaction also
-         * times out and they need to be reapplied.
-         *
-         * @todo Note that at this point, the large transaction case (tx exceeds 10,000,000 bytes)
-         * is not handled.
-         */
-        inserts.forEach(insert -> { tx.set(insert.getKey(), insert.getValue()); });
-
-        deletions.forEach(delete -> { tx.clear(delete); });
+        this.maxRuns = maxRuns;
     }
 
     @Override
@@ -124,10 +87,50 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         }
     }
 
+    private synchronized boolean isCommitAllowed() {
+        if (txCtr.get() == 0) {
+            // committing the first transaction period is always allowed
+            return true;
+        }
+
+        switch (isolationLevel) {
+        case SERIALIZABLE:
+            return !hasCompletedReadOperation;
+        case READ_COMMITTED_NO_WRITE:
+            // retries are allowed as long as no data was read or if there are no writes to perform
+            return (inserts.isEmpty() && deletions.isEmpty()) || !hasCompletedReadOperation;
+        case READ_COMMITTED_WITH_WRITE:
+            return true;
+        default:
+            // default case: should not occur
+            return false;
+        }
+    }
+
+    private synchronized boolean isRestartAllowed() {
+        switch (isolationLevel) {
+        case SERIALIZABLE:
+            // only retry this transaction if it has not exposed any data yet
+            return !hasCompletedReadOperation;
+        case READ_COMMITTED_NO_WRITE:
+            return true;
+        case READ_COMMITTED_WITH_WRITE:
+            return true;
+        default:
+            // default case: should not occur
+            return false;
+        }
+    }
+
     @Override
     public synchronized void commit() throws BackendException {
         boolean failing = true;
+
         for (int i = 0; i < maxRuns; i++) {
+            if (!isCommitAllowed()) {
+                break;
+            }
+
             super.commit();
 
             if (tx == null) {
@@ -136,12 +139,12 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
             if (log.isTraceEnabled()) {
                 log.trace("{} committed", this.toString(),
-                          new FoundationDBTx.TransactionClosed(this.toString()));
+                        new FoundationDBTx.TransactionClosed(this.toString()));
             }
 
             try {
                 if (!inserts.isEmpty() || !deletions.isEmpty()) {
-                    tx.commit().get();
+                    tx.commit().get(COMMIT_TIMEOUT_SECONCS, TimeUnit.SECONDS);
                 } else {
                     // nothing to commit so skip it
                     tx.cancel();
@@ -150,7 +153,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                 tx = null;
                 failing = false;
                 break;
-            } catch (IllegalStateException | ExecutionException e) {
+            } catch (IllegalStateException | ExecutionException | TimeoutException e) {
                 restart();
             } catch (Exception e) {
                 throw new FoundationDBTxException(e);
@@ -160,6 +163,33 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         if (failing) {
             throw new FoundationDBTxException(FoundationDBTxException.TIMEOUT);
         }
+    }
+
+    public synchronized void restart() {
+        if (!isRestartAllowed() || tx == null) {
+            return;
+        }
+
+        txCtr.incrementAndGet();
+
+        try {
+            tx.cancel();
+        } catch (IllegalStateException ignored) {
+        } finally {
+            tx.close();
+        }
+
+        tx = db.createTransaction();
+
+        /*
+         * Reapply mutations but do not clear them out just in case this transaction also
+         * times out and they need to be reapplied.
+         *
+         * @todo Note that at this point, the large transaction case (tx exceeds 10,000,000 bytes)
+         * is not handled.
+         */
+        inserts.forEach(insert -> { tx.set(insert.getKey(), insert.getValue()); });
+        deletions.forEach(delete -> { tx.clear(delete); });
     }
 
     @Override
@@ -180,7 +210,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
      * @throws FoundationDBTxException If the read operation can not be completed.
      */
     public byte[] get(final byte[] key) throws FoundationDBTxException {
-        byte[] result = waitForFuture(readWithRetriesAsync(readTx -> readTx.get(key)));
+        byte[] result = await(readWithRetriesAsync(readTx -> readTx.get(key)));
 
         synchronized (this) {
             hasCompletedReadOperation = true;
@@ -197,7 +227,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
      */
     public List<KeyValue> getRange(final FoundationDBRangeQuery query)
         throws FoundationDBTxException {
-        List<KeyValue> result = waitForFuture(
+        List<KeyValue> result = await(
             readWithRetriesAsync(readTx
                                  -> readTx
                                         .getRange(query.getStartKeySelector(),
@@ -231,7 +261,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
         Map<KVQuery, List<KeyValue>> resultMap = new ConcurrentHashMap<>();
         for (Entry<KVQuery, CompletableFuture<List<KeyValue>>> entry : futureMap.entrySet()) {
-            resultMap.put(entry.getKey(), waitForFuture(entry.getValue()));
+            resultMap.put(entry.getKey(), await(entry.getValue()));
         }
 
         synchronized (this) {
@@ -271,7 +301,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
      * @return The future's result if completion was successful.
      * @throws FoundationDBTxException If the future completed exceptionally.
      */
-    private <T> T waitForFuture(CompletableFuture<T> future) throws FoundationDBTxException {
+    private <T> T await(CompletableFuture<T> future) throws FoundationDBTxException {
         try {
             return future.join();
         } catch (CompletionException cex) {
@@ -286,6 +316,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                     throw new FoundationDBTxException(eex);
                 }
             } catch (InterruptedException | IllegalStateException e) {
+                e.printStackTrace();
                 throw new FoundationDBTxException(FoundationDBTxException.INTERRUPTED, e);
             } catch (Throwable impossible) {
                 throw new AssertionError(impossible);
@@ -312,11 +343,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
         for (int i = 1; i < maxRuns; ++i) {
             future = future.exceptionally(th -> {
                 if (txCtr.get() == startTxId[0]) {
-                    try {
-                        this.restart();
-                    } catch (FoundationDBTxException fdbtex) {
-                        throw new CompletionException(fdbtex);
-                    }
+                    this.restart();
                 }
                 startTxId[0] = txCtr.get();
                 try {

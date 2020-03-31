@@ -23,6 +23,7 @@ import org.janusgraph.diskstorage.configuration.ConfigOption;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphOperationCountingTest;
+import org.janusgraph.testutil.FlakyTest;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,7 @@ public class FoundationDBOperationCountingTest extends JanusGraphOperationCounti
     }
 
     @Test
+    @FlakyTest
     @Override
     public void testCacheConcurrency() throws InterruptedException {
         // this test's isolation level is set to SERIALIZABLE in getConfiguration

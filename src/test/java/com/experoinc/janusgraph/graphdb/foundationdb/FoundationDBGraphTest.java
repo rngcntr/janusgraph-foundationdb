@@ -22,6 +22,10 @@ import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBConfigOptio
 import com.experoinc.janusgraph.diskstorage.foundationdb.FoundationDBTx.IsolationLevel;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.janusgraph.TestCategory;
 import org.janusgraph.core.JanusGraphException;
 import org.janusgraph.core.JanusGraphFactory;
 import org.janusgraph.diskstorage.BackendException;
@@ -29,6 +33,7 @@ import org.janusgraph.diskstorage.configuration.ConfigOption;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,26 +46,31 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 public class FoundationDBGraphTest extends JanusGraphTest {
 
-    @Container
-    public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
+    @Container public static final FoundationDBContainer fdbContainer = new FoundationDBContainer();
 
-    private static final Logger log =
-            LoggerFactory.getLogger(FoundationDBGraphTest.class);
+    private static final Logger log = LoggerFactory.getLogger(FoundationDBGraphTest.class);
+
+    private List<String> needSerializable = new ArrayList<>(
+        Arrays.asList("testConsistencyEnforcement()", "testConcurrentConsistencyEnforcement()"));
 
     @Override
     public WriteConfiguration getConfiguration() {
-        ModifiableConfiguration modifiableConfiguration = fdbContainer.getFoundationDBConfiguration();
+        ModifiableConfiguration modifiableConfiguration =
+            fdbContainer.getFoundationDBConfiguration();
         String methodName = this.testInfo.getDisplayName();
-        if (methodName.equals("testConsistencyEnforcement()") || methodName.equals("testConcurrentConsistencyEnforcement()")) {
+        if (needSerializable.contains(methodName)) {
             IsolationLevel iso = IsolationLevel.SERIALIZABLE;
             log.debug("Forcing isolation level {} for test method {}", iso, methodName);
             modifiableConfiguration.set(FoundationDBConfigOptions.ISOLATION_LEVEL, iso.toString());
         } else {
             IsolationLevel iso = null;
             if (modifiableConfiguration.has(FoundationDBConfigOptions.ISOLATION_LEVEL)) {
-                iso = ConfigOption.getEnumValue(modifiableConfiguration.get(FoundationDBConfigOptions.ISOLATION_LEVEL),IsolationLevel.class);
+                iso = ConfigOption.getEnumValue(
+                    modifiableConfiguration.get(FoundationDBConfigOptions.ISOLATION_LEVEL),
+                    IsolationLevel.class);
             }
-            log.debug("Using isolation level {} (null means adapter default) for test method {}", iso, methodName);
+            log.debug("Using isolation level {} (null means adapter default) for test method {}",
+                      iso, methodName);
         }
         return modifiableConfiguration.getConfiguration();
     }
@@ -79,10 +89,28 @@ public class FoundationDBGraphTest extends JanusGraphTest {
         super.testConcurrentConsistencyEnforcement();
     }
 
+    @Tag(TestCategory.BRITTLE_TESTS)
     @Test
     @Override
-    public void testTinkerPopOptimizationStrategies() {
-        super.testTinkerPopOptimizationStrategies();
+    public void testIndexShouldRegisterWhenWeRemoveAnInstance() throws InterruptedException {
+        /**
+         * This test outputs expected log message
+         * "INFO: Set status REGISTERED on schema element theIndex with property keys []"
+         * ONLY in debugging mode but not when the test is run automatically
+         */
+        super.testIndexShouldRegisterWhenWeRemoveAnInstance();
+    }
+
+    @Test
+    @Override
+    @Tag(TestCategory.BRITTLE_TESTS)
+    public void testIndexUpdateSyncWithMultipleInstances() throws InterruptedException {
+        /**
+         * This test outputs expected log message
+         * "INFO: Set status REGISTERED on schema element theIndex with property keys []"
+         * ONLY in debugging mode but not when the test is run automatically
+         */
+        super.testIndexUpdateSyncWithMultipleInstances();
     }
 
     @Test
@@ -96,7 +124,6 @@ public class FoundationDBGraphTest extends JanusGraphTest {
             graph.addVertex();
             fail();
         } catch (JanusGraphException ignored) {
-
         }
 
         assertTrue(graph.isOpen());
