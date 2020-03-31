@@ -17,6 +17,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.janusgraph.diskstorage.BackendException;
@@ -40,7 +42,8 @@ public class FoundationDBTx extends AbstractStoreTransaction {
     private List<SimpleEntry<byte[], byte[]>> inserts = new LinkedList<>();
     private List<byte[]> deletions = new LinkedList<>();
 
-    private long maxRuns = 1;
+    private final long COMMIT_TIMEOUT_SECONCS = 5;
+    private final long maxRuns;
 
     public enum IsolationLevel { SERIALIZABLE, READ_COMMITTED_NO_WRITE, READ_COMMITTED_WITH_WRITE }
 
@@ -141,7 +144,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
 
             try {
                 if (!inserts.isEmpty() || !deletions.isEmpty()) {
-                    tx.commit().get();
+                    tx.commit().get(COMMIT_TIMEOUT_SECONCS, TimeUnit.SECONDS);
                 } else {
                     // nothing to commit so skip it
                     tx.cancel();
@@ -150,7 +153,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                 tx = null;
                 failing = false;
                 break;
-            } catch (IllegalStateException | ExecutionException e) {
+            } catch (IllegalStateException | ExecutionException | TimeoutException e) {
                 restart();
             } catch (Exception e) {
                 throw new FoundationDBTxException(e);
