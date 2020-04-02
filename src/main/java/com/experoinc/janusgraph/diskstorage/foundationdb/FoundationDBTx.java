@@ -211,11 +211,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
      */
     public byte[] get(final byte[] key) throws FoundationDBTxException {
         byte[] result = await(readWithRetriesAsync(readTx -> readTx.get(key)));
-
-        synchronized (this) {
-            hasCompletedReadOperation = true;
-            return result;
-        }
+        return result;
     }
 
     /**
@@ -233,10 +229,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
                                         .getRange(query.getStartKeySelector(),
                                                   query.getEndKeySelector(), query.getLimit())
                                         .asList()));
-        synchronized (this) {
-            hasCompletedReadOperation = true;
-            return result != null ? result : Collections.emptyList();
-        }
+        return result != null ? result : Collections.emptyList();
     }
 
     /**
@@ -264,10 +257,7 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             resultMap.put(entry.getKey(), await(entry.getValue()));
         }
 
-        synchronized (this) {
-            hasCompletedReadOperation = true;
-            return resultMap;
-        }
+        return resultMap;
     }
 
     /**
@@ -354,7 +344,17 @@ public class FoundationDBTx extends AbstractStoreTransaction {
             });
         }
 
-        return future;
+        synchronized (this) {
+            if (isolationLevel == IsolationLevel.SERIALIZABLE && txCtr.get() != startTxId[0]) {
+                // another thread has restarted the transaction while this thread has successfully
+                // received data from the old transaction context. Therefore, one of both operations
+                // has to fail
+                throw new FoundationDBTxException(FoundationDBTxException.CLOSED_WHILE_ACTIVE);
+            } else {
+                hasCompletedReadOperation = true;
+                return future;
+            }
+        }
     }
 
     /**

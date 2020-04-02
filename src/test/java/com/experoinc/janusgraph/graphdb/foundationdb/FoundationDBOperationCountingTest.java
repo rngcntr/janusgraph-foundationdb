@@ -23,7 +23,6 @@ import org.janusgraph.diskstorage.configuration.ConfigOption;
 import org.janusgraph.diskstorage.configuration.ModifiableConfiguration;
 import org.janusgraph.diskstorage.configuration.WriteConfiguration;
 import org.janusgraph.graphdb.JanusGraphOperationCountingTest;
-import org.janusgraph.testutil.FlakyTest;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +55,7 @@ public class FoundationDBOperationCountingTest extends JanusGraphOperationCounti
         modifiableConfiguration.set(DB_CACHE, false);
 
         String methodName = this.testInfo.getDisplayName();
-        if (methodName.equals("testCacheConcurrency()") || methodName.equals("testConcurrentConsistencyEnforcement()")) {
+        if (methodName.equals("testConcurrentConsistencyEnforcement()")) {
             IsolationLevel iso = IsolationLevel.SERIALIZABLE;
             log.debug("Forcing isolation level {} for test method {}", iso, methodName);
             modifiableConfiguration.set(FoundationDBConfigOptions.ISOLATION_LEVEL, iso.toString());
@@ -72,10 +71,9 @@ public class FoundationDBOperationCountingTest extends JanusGraphOperationCounti
     }
 
     @Test
-    @FlakyTest
     @Override
     public void testCacheConcurrency() throws InterruptedException {
-        // this test's isolation level is set to SERIALIZABLE in getConfiguration
+        // this test fails sometimes for unknown reasons
         super.testCacheConcurrency();
     }
 }
