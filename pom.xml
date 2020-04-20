@@ -11,7 +11,7 @@
     <name>JanusGraph FoundationDB Storage Adapter</name>
 
     <properties>
-        <maven.compiler.plugin.version>3.6.2</maven.compiler.plugin.version>
+        <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
         <jdk.version>1.8</jdk.version>
         <janusgraph.version>0.5.0</janusgraph.version>
         <foundationdb.version>6.2.10</foundationdb.version>
