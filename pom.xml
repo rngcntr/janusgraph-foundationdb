@@ -20,7 +20,7 @@
         <testcontainers.version>1.13.0</testcontainers.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
         <maven.assembly.plugin.version>2.5.3</maven.assembly.plugin.version>
-        <slf4j.version>1.7.25</slf4j.version>
+        <slf4j.version>1.7.30</slf4j.version>
         <test.skip.default>false</test.skip.default>
         <test.skip.tp>true</test.skip.tp>
     </properties>
