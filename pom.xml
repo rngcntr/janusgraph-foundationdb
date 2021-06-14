@@ -16,7 +16,7 @@
         <janusgraph.version>0.5.0</janusgraph.version>
         <foundationdb.version>6.2.10</foundationdb.version>
         <junit.jupiter.version>5.5.2</junit.jupiter.version>
-        <dependency.plugin.version>3.1.2</dependency.plugin.version>
+        <dependency.plugin.version>3.2.0</dependency.plugin.version>
         <testcontainers.version>1.13.0</testcontainers.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
         <maven.assembly.plugin.version>2.5.3</maven.assembly.plugin.version>
